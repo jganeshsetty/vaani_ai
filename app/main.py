@@ -21,10 +21,16 @@ logger = logging.getLogger("vaani")
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
     logger.info("VaaniCall AI starting on %s:%s", settings.host, settings.port)
-    await connect_to_mongo()
+    try:
+        await connect_to_mongo()
+    except Exception as exc:
+        logger.warning("Could not connect to MongoDB on startup: %s", exc)
     yield
     logger.info("VaaniCall AI shutting down")
-    await close_mongo_connection()
+    try:
+        await close_mongo_connection()
+    except Exception:
+        pass
 
 
 app = FastAPI(
