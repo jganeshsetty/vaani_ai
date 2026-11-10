@@ -52,7 +52,19 @@ async def trigger_exotel_call(
 
     url = f"{settings.exotel_base_url}/Accounts/{account_sid}/Calls/connect.json"
 
+    import os
     stream_base = settings.exotel_stream_url
+    if not stream_base:
+        render_host = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+        railway_host = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+        fly_app = os.getenv("FLY_APP_NAME")
+        if render_host:
+            stream_base = f"wss://{render_host}"
+        elif railway_host:
+            stream_base = f"wss://{railway_host}"
+        elif fly_app:
+            stream_base = f"wss://{fly_app}.fly.dev"
+
     if stream_base:
         if stream_base.startswith("http://"):
             stream_base = "ws://" + stream_base[7:]

@@ -1,9 +1,8 @@
 """Agentic conversation engine.
 
 Consumes STT transcripts from Gnani Prisma, decides what to say next based on
-the task constraints, and hands text to Gnani Timbre for synthesis. Also
-classifies each question as confirmed / unclear / not_asked based on the
-callee's response.
+the user's task instructions and constraints, and hands text to Gnani Timbre
+for synthesis. Converses naturally and informally without AI clichés.
 """
 from __future__ import annotations
 
@@ -22,7 +21,7 @@ logger = logging.getLogger("vaani.agent")
 
 _KANNADA_CHARS = re.compile(r"[ಀ-೿]")
 _KANNADA_WORDS = {"ನಮಸ್ತೆ", "ಹೌದು", "ಇಲ್ಲ", "ಇದೆ", "ಧನ್ಯವಾದ", "ಕನ್ನಡ", "ಹಲೋ"}
-_ENGLISH_WORDS = {"yes", "no", "hello", "ok", "sure", "dispatched", "shipped"}
+_ENGLISH_WORDS = {"yes", "no", "hello", "ok", "sure", "dispatched", "shipped", "done", "complete"}
 
 
 def detect_language(text: str) -> Language:
@@ -45,11 +44,11 @@ def detect_language(text: str) -> Language:
 
 # Heuristic markers for "yes/confirmed" vs "no/unclear".
 _POSITIVE_MARKERS = re.compile(
-    r"\b(yes|yeah|yep|sure|dispatched|shipped|sent|confirmed|available|done|okay|ok)\b",
+    r"\b(yes|yeah|yep|sure|dispatched|shipped|sent|confirmed|available|done|okay|ok|complete|completed|finish|finished|ಹೌದು|ಆಗಿದೆ|ಮುಗಿದಿದೆ|ಇದೆ|ಸರಿ|ರೆಡಿ)\b",
     re.IGNORECASE,
 )
 _NEGATIVE_MARKERS = re.compile(
-    r"\b(no|not yet|dont|don't|not sure|unclear|maybe|later|cannot|can't|waiting)\b",
+    r"\b(no|not yet|dont|don't|not sure|unclear|maybe|later|cannot|can't|waiting|ಇಲ್ಲ|ಆಗಿಲ್ಲ|ಇನ್ನೂ ಇಲ್ಲ)\b",
     re.IGNORECASE,
 )
 
@@ -99,14 +98,30 @@ class AgentState:
         self.confirmed[question] = status
 
 
+def clean_topic_instruction(text: str) -> str:
+    """Clean the user instruction by stripping persona wrappers and boilerplate."""
+    if not text:
+        return ""
+    # Strip persona prefix
+    cleaned = re.sub(r"\[CALLER_PERSONA:[^\]]+\]", "", text).strip()
+    # Strip leading phrases like "Call ... and ask if / whether / to"
+    cleaned = re.sub(
+        r"^(?:please\s+)?(?:call|ask|check with|tell)\s+(?:the\s+)?(?:[A-Za-z0-9]+\s+)?(?:and\s+)?(?:ask|check)?\s*(?:if|about|whether)?\s*",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    ).strip()
+    return cleaned if cleaned else text
+
+
 def extract_caller_name(state: AgentState) -> Optional[str]:
     """Extract a human person name to speak as, strictly avoiding robotic or AI mentions."""
     desc = state.task.description or ""
-    # Look for explicit name patterns like "call as Ganesh", "I am Sunil", "from Rahul", etc.
-    m = re.search(r"\b(?:i am|name[:\s]+|from|as|call as)\s+([A-Za-z]+)", desc, re.IGNORECASE)
+    # Look for explicit name patterns
+    m = re.search(r"\b(?:i am|name[:\s]+|from|as|call as|speak as)\s+([A-Za-z]+)", desc, re.IGNORECASE)
     if m:
         candidate = m.group(1).capitalize()
-        if candidate.lower() not in ("a", "an", "the", "store", "order", "delivery"):
+        if candidate.lower() not in ("a", "an", "the", "store", "order", "delivery", "person"):
             return candidate
     uid = getattr(state.task, "user_id", "") or ""
     if uid and uid.lower() not in ("u1", "anonymous", "user", "default", "test"):
@@ -116,39 +131,66 @@ def extract_caller_name(state: AgentState) -> Optional[str]:
     return None
 
 
+def pick_next_question(state: AgentState) -> Optional[str]:
+    """Return the next question to ask, falling back to task description."""
+    remaining = state.remaining_questions
+    if remaining:
+        return remaining[0]
+    main_desc = clean_topic_instruction(state.task.description or "")
+    if main_desc and main_desc not in state.asked:
+        return main_desc
+    return None
+
+
 def build_opening_greeting(state: AgentState) -> str:
     """Build an informal, friendly greeting starting with Hello/ಹಲೋ without introducing as an AI."""
     lang = state.language
     caller_name = extract_caller_name(state)
 
+    if settings.concise_mode:
+        if lang == Language.KANNADA:
+            if caller_name:
+                return f"ಹಲೋ, ನಮಸ್ತೆ! ನಾನು {caller_name}."
+            return "ಹಲೋ, ನಮಸ್ತೆ! ಸಣ್ಣ ವಿಷಯ ಕೇಳ್ಬೇಕಿತ್ತು."
+        if lang == Language.KANGLISH:
+            if caller_name:
+                return f"Hello! {caller_name} illi."
+            return "Hello, namaskara! Quick check."
+        if caller_name:
+            return f"Hello! This is {caller_name}."
+        return "Hello! Quick check regarding this."
+
+    topic = pick_next_question(state) or clean_topic_instruction(state.task.description or "")
+    if topic:
+        state.mark_asked(topic)
+
     if lang == Language.KANNADA:
+        if caller_name and topic:
+            return f"ಹಲೋ, ನಮಸ್ತೆ! ನಾನು {caller_name}. {topic} ಅಂತ ಕೇಳ್ಬೇಕಿತ್ತು."
         if caller_name:
             return f"ಹಲೋ, ನಮಸ್ತೆ! ನಾನು {caller_name}, ಸಣ್ಣ ವಿಷಯ ಕೇಳ್ಬೇಕಿತ್ತು."
-        return "ಹಲೋ, ನಮಸ್ತೆ! ಒಂದು ಸಣ್ಣ ವಿಷಯ ಕೇಳ್ಬೇಕಿತ್ತು."
+        return f"ಹಲೋ, ನಮಸ್ತೆ! {topic} ಅಂತ ಕೇಳ್ಬೇಕಿತ್ತು." if topic else "ಹಲೋ, ನಮಸ್ತೆ! ಒಂದು ಸಣ್ಣ ವಿಷಯ ಕೇಳ್ಬೇಕಿತ್ತು."
 
     if lang == Language.KANGLISH:
+        if caller_name and topic:
+            return f"Hello, namaskara! {caller_name} illi. {topic} check madbekittu."
         if caller_name:
             return f"Hello, namaskara! {caller_name} illi. Quick check madbekittu."
-        return "Hello, namaskara! Just a quick check madbekittu."
+        return f"Hello, namaskara! {topic} check madbekittu." if topic else "Hello, namaskara! Just a quick check."
 
+    # English default
+    if caller_name and topic:
+        return f"Hello! This is {caller_name}. Just calling to check: {topic}."
     if caller_name:
         return f"Hello! This is {caller_name}. Just calling for a quick check."
-    return "Hello! Just calling for a quick check regarding this."
-
-
-def pick_next_question(state: AgentState) -> Optional[str]:
-    """Return the next question to ask, or None if all questions have been asked."""
-    remaining = state.remaining_questions
-    if not remaining:
-        return None
-    return remaining[0]
+    return f"Hello! Just calling to check: {topic}." if topic else "Hello! Just calling for a quick check."
 
 
 def build_followup(state: AgentState, callee_text: str) -> Optional[str]:
     """Decide the next informal agent utterance after a callee response.
 
     When the callee says hello or initiates the conversation, the agent starts
-    with 'Hello' / 'ಹಲೋ' and seamlessly continues the conversation.
+    with 'Hello' / 'ಹಲೋ' and continues addressing the user's custom instruction.
     """
     state.turn += 1
     if state.turn >= state.max_turns:
@@ -157,56 +199,49 @@ def build_followup(state: AgentState, callee_text: str) -> Optional[str]:
 
     caller_name = extract_caller_name(state)
     lang = state.language
-    callee_said_hello = bool(_GREETING_MARKERS.search(callee_text)) or "ಹಲೋ" in callee_text
+    callee_said_hello = bool(_GREETING_MARKERS.search(callee_text)) or "ಹಲೋ" in callee_text or "hello" in callee_text.lower()
+    topic = clean_topic_instruction(state.task.description or "")
 
-    # If we have outstanding questions, ask the next one informally.
-    question = pick_next_question(state)
-    if question is not None:
+    # 1. If callee said "Hello" / "ಹಲೋ", respond starting with "Hello" and continue
+    if callee_said_hello and state.turn <= 2:
+        question = pick_next_question(state) or topic
         state.mark_asked(question)
-        status = classify_response(callee_text, question)
-        state.mark_confirmed(question, status)
-
-        # If the opposite person said hello or it's the opening turn, start with Hello and continue!
-        if callee_said_hello or state.turn <= 1:
-            if lang == Language.KANNADA:
-                intro = f"ಹಲೋ, ನಮಸ್ತೆ! ನಾನು {caller_name}, " if caller_name else "ಹಲೋ, ನಮಸ್ತೆ! "
-                return f"{intro}{_translit(question)}?"
-            if lang == Language.KANGLISH:
-                intro = f"Hello, namaskara! {caller_name} illi. " if caller_name else "Hello! "
-                return f"{intro}{question}?"
-            intro = f"Hello! This is {caller_name}. " if caller_name else "Hello! "
-            return f"{intro}Just wanted to ask: {question}?"
-
-        # Ongoing conversation turns
         if lang == Language.KANNADA:
-            return f"ಹೌದಾ? ಸರಿ ಕಣ್ರೀ! {_translit(question)}?"
+            intro = f"ಹಲೋ, ನಮಸ್ತೆ! ನಾನು {caller_name}. " if caller_name else "ಹಲೋ, ನಮಸ್ತೆ! "
+            return f"{intro}{question} ಅಂತ ಕೇಳ್ಬೇಕಿತ್ತು?"
         if lang == Language.KANGLISH:
-            return f"Super, got it! {question}?"
-        return f"Got it, thanks! {question}?"
+            intro = f"Hello, namaskara! {caller_name} illi. " if caller_name else "Hello! "
+            return f"{intro}{question}?"
+        intro = f"Hello! This is {caller_name}. " if caller_name else "Hello! "
+        return f"{intro}Just wanted to check: {question}?"
 
-    # No more questions — wrap up informally like a real person.
+    # 2. Check if callee is asking who is speaking
+    if any(w in callee_text.lower() for w in ["who is this", "ಯಾರು", "yaaru", "who"]):
+        if lang == Language.KANNADA:
+            return f"ನಾನು {caller_name or 'ಸ್ನೇಹಿತರು'} ಮಾತಾಡ್ತಿರೋದು. {topic} ವಿಷಯಕ್ಕೆ ಕಾಲ್ ಮಾಡಿದ್ದೆ."
+        if lang == Language.KANGLISH:
+            return f"{caller_name or 'Friend'} illi matadtirodu. {topic} bagge call madidde."
+        return f"This is {caller_name or 'a caller'}. I was calling regarding: {topic}."
+
+    # 3. If callee answered or confirmed
+    status = classify_response(callee_text, topic)
+    state.mark_confirmed(topic, status)
+
+    # Wrap up naturally
     state.done = True
-    if state.language == Language.KANNADA:
-        return "ಓಕೆ ಕಣ್ರೀ, ತುಂಬಾ ಧನ್ಯವಾದಗಳು! ಸರಿ ಬಾಯ್."
-    if state.language == Language.KANGLISH:
-        return "Okay pa, thank you so much! Take care, bye."
-    return "Awesome, thanks a lot! Take care, bye."
-
-
-def _translit(text: str) -> str:
-    """Best-effort: return text unchanged for now (Gnani handles mixed scripts)."""
-    return text
+    if lang == Language.KANNADA:
+        return "ತುಂಬಾ ಸಂತೋಷ, ವಿವರ ತಿಳಿಸಿದ್ದಕ್ಕೆ ಧನ್ಯವಾದಗಳು! ಕರೆ ಮುಕ್ತಾಯ ಮಾಡ್ತಿದ್ದೀನಿ, ನಮಸ್ಕಾರ."
+    if lang == Language.KANGLISH:
+        return "Super, got it! Thank you so much for the info pa. Take care, bye!"
+    return "Great, thank you so much for confirming! Have a great day, bye!"
 
 
 def build_summary(state: AgentState) -> str:
-    """Build a final summary of the call for the user."""
-    lines = [f"Task: {state.task.description}"]
+    """Build a final summary of the call based on the user's task and the callee's response."""
+    lines = [f"Call Task: {state.task.description}"]
     for q, status in state.confirmed.items():
-        if isinstance(status, ConfirmationStatus):
-            st = status.value
-        else:
-            st = str(status)
-        lines.append(f"- {q}: {st}")
+        st = status.value if isinstance(status, ConfirmationStatus) else str(status)
+        lines.append(f"Outcome ({q}): {st}")
     if not state.confirmed:
-        lines.append("- No questions were asked or answered.")
+        lines.append("Call completed with callee.")
     return "\n".join(lines)

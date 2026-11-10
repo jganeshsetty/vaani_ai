@@ -9,9 +9,9 @@ function LiveCallContent() {
   const searchParams = useSearchParams();
 
   const callId = searchParams.get('call_id');
-  const phoneParam = searchParams.get('phone') || '+91 86600 39103';
-  const descParam = searchParams.get('desc') || 'Personal inquiry call';
-  const callerParam = searchParams.get('caller') || 'Ganesh';
+  const phoneParam = searchParams.get('phone') || '';
+  const descParam = searchParams.get('desc') || '';
+  const callerParam = searchParams.get('caller') || 'User';
 
   const [call, setCall] = useState<Call | null>(null);
   const [task, setTask] = useState<Task | null>(null);
@@ -19,8 +19,8 @@ function LiveCallContent() {
   const [seconds, setSeconds] = useState(0);
   const [callStatus, setCallStatus] = useState<'calling' | 'ringing' | 'in_progress' | 'completed'>('calling');
   const [callerName, setCallerName] = useState(callerParam);
-  const [recipientName, setRecipientName] = useState('Ganesh');
-  const [targetNumber, setTargetNumber] = useState(phoneParam);
+  const [recipientName, setRecipientName] = useState(phoneParam ? `Recipient (${phoneParam})` : 'Recipient');
+  const [targetNumber, setTargetNumber] = useState(phoneParam || 'Outgoing Line');
 
   const hasInitialized = useRef(false);
 
@@ -47,10 +47,10 @@ function LiveCallContent() {
     hasInitialized.current = true;
 
     (async () => {
-      let isGaneshCall =
-        descParam.toLowerCase().includes('ganesh') ||
-        phoneParam.includes('8660039103') ||
-        phoneParam.includes('86600 39103');
+      let nameToDisplay = phoneParam ? `Contact (${phoneParam})` : 'Recipient';
+      if (descParam.toLowerCase().includes('ganesh') || phoneParam.includes('8660039103')) {
+        nameToDisplay = 'Ganesh';
+      }
 
       if (callId) {
         try {
@@ -58,20 +58,21 @@ function LiveCallContent() {
           setCall(callData);
           if (callData.target_number) {
             setTargetNumber(callData.target_number);
-            if (callData.target_number.includes('8660039103')) isGaneshCall = true;
+            if (callData.target_number.includes('8660039103')) nameToDisplay = 'Ganesh';
+            else nameToDisplay = `Recipient (${callData.target_number})`;
           }
 
           if (callData.task_id) {
             const taskData = await fetchTask(callData.task_id);
             setTask(taskData);
-            if (taskData.description?.toLowerCase().includes('ganesh')) isGaneshCall = true;
+            if (taskData.description?.toLowerCase().includes('ganesh')) nameToDisplay = 'Ganesh';
           }
         } catch (e) {
           console.warn('Could not fetch call details:', e);
         }
       }
 
-      setRecipientName(isGaneshCall ? 'Ganesh' : 'Recipient Contact');
+      setRecipientName(nameToDisplay);
 
       // 1. Initial State: Calling
       setCallStatus('calling');

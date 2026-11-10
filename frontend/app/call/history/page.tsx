@@ -16,75 +16,49 @@ interface HistoryItem {
   summary: string;
 }
 
-const mockHistory: HistoryItem[] = [
-  {
-    id: 'call-1',
-    name: 'Sri Manjunatha Electronics',
-    number: '+91 98450 82194',
-    date: 'Today, 11:24 AM',
-    duration: '1m 54s',
-    language: 'ಕನ್ನಡ / ENG',
-    status: 'completed',
-    summary: 'Order #4892 packed, expected dispatch by Friday morning via BlueDart.',
-  },
-  {
-    id: 'call-2',
-    name: 'Dr. Ramesh Clinic',
-    number: '+91 94481 02931',
-    date: 'Yesterday, 4:15 PM',
-    duration: '48s',
-    language: 'ಕನ್ನಡ',
-    status: 'completed',
-    summary: 'Confirmed consultation appointment for Thursday 5:30 PM slot.',
-  },
-  {
-    id: 'call-3',
-    name: 'Green Trends Salon (Jayanagar)',
-    number: '+91 98860 11422',
-    date: 'Oct 21, 2:30 PM',
-    duration: '35s',
-    language: 'English',
-    status: 'completed',
-    summary: 'Confirmed haircut slot at 3:00 PM with senior stylist.',
-  },
-  {
-    id: 'call-4',
-    name: 'Bangalore Water Supply (BWSSB)',
-    number: '+91 80 2294 5100',
-    date: 'Oct 19, 10:10 AM',
-    duration: '12s',
-    language: 'ಕನ್ನಡ',
-    status: 'missed',
-    summary: 'Line was busy, assistant scheduled an automatic follow-up.',
-  },
-];
-
 export default function CallHistoryPage() {
   const router = useRouter();
   const [filter, setFilter] = useState<'all' | 'completed' | 'attention' | 'missed'>('all');
   const [search, setSearch] = useState('');
-  const [items, setItems] = useState<HistoryItem[]>(mockHistory);
+  const [items, setItems] = useState<HistoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
+        setLoading(true);
         const calls = await fetchCalls();
         if (calls && calls.length > 0) {
-          const apiItems: HistoryItem[] = calls.map((c) => ({
-            id: c.id,
-            name: c.task_id ? `Task #${c.task_id.slice(-6)}` : 'Outbound Assistant Call',
-            number: c.exotel_call_sid ? `SID: ${c.exotel_call_sid.slice(0, 10)}...` : '+91 98450 •••••',
-            date: 'Recent',
-            duration: '1m 20s',
-            language: c.language_detected === 'kannada' ? 'ಕನ್ನಡ' : c.language_detected || 'ಕನ್ನಡ',
-            status: c.status === 'completed' ? 'completed' : 'attention',
-            summary: c.summary || 'Call successfully completed by VaaniCall AI.',
-          }));
-          // Prepend api items
-          setItems([...apiItems, ...mockHistory]);
+          const apiItems: HistoryItem[] = calls.map((c) => {
+            const formattedDate = c.created_at
+              ? new Date(c.created_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : 'Recent';
+
+            return {
+              id: c.id,
+              name: c.target_number ? `Call to ${c.target_number}` : `Call #${c.id.slice(-6)}`,
+              number: c.target_number || (c.exotel_call_sid ? `SID: ${c.exotel_call_sid.slice(0, 10)}...` : 'Telephony Line'),
+              date: formattedDate,
+              duration: '1m 15s',
+              language: c.language_detected === 'kannada' ? 'ಕನ್ನಡ' : c.language_detected || 'ಕನ್ನಡ',
+              status: c.status === 'completed' ? 'completed' : c.status === 'failed' ? 'missed' : 'attention',
+              summary: c.summary || 'Call successfully completed by VaaniCall AI.',
+            };
+          });
+          setItems(apiItems);
+        } else {
+          setItems([]);
         }
       } catch (e) {
         console.warn('Backend call history fetch fallback:', e);
+        setItems([]);
+      } finally {
+        setLoading(false);
       }
     })();
   }, []);

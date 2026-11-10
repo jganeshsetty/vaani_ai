@@ -1,7 +1,31 @@
 /** API client for communicating with the VaaniCall AI backend. */
 
-const rawBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').trim().replace(/\/+$/, '');
-const API_BASE = rawBase.endsWith('/api') ? rawBase : `${rawBase}/api`;
+export function getApiBase(): string {
+  if (typeof window !== 'undefined') {
+    // 1. LocalStorage manual override if configured
+    const custom = localStorage.getItem('vaani_backend_url')?.trim();
+    if (custom) {
+      const clean = custom.replace(/\/+$/, '');
+      return clean.endsWith('/api') ? clean : `${clean}/api`;
+    }
+
+    // 2. If running on deployed domain (not localhost)
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+
+    if (!isLocalhost) {
+      if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+        const clean = envUrl.replace(/\/+$/, '');
+        return clean.endsWith('/api') ? clean : `${clean}/api`;
+      }
+      // Proxied through Next.js rewrites to backend
+      return `${window.location.origin}/api`;
+    }
+  }
+
+  const rawBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').trim().replace(/\/+$/, '');
+  return rawBase.endsWith('/api') ? rawBase : `${rawBase}/api`;
+}
 
 export interface Task {
   id: string;
@@ -38,7 +62,8 @@ export interface TranscriptEntry {
 }
 
 export async function fetchTasks(userId?: string): Promise<Task[]> {
-  const url = userId ? `${API_BASE}/tasks?user_id=${userId}` : `${API_BASE}/tasks`;
+  const base = getApiBase();
+  const url = userId ? `${base}/tasks?user_id=${userId}` : `${base}/tasks`;
   const res = await fetch(url);
   if (!res.ok) throw new Error('Failed to fetch tasks');
   return res.json();
@@ -52,7 +77,8 @@ export async function createTask(data: {
   constraints?: string[];
   questions_to_ask?: string[];
 }): Promise<Task> {
-  const res = await fetch(`${API_BASE}/tasks`, {
+  const base = getApiBase();
+  const res = await fetch(`${base}/tasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -66,7 +92,8 @@ export async function startCall(data: {
   language?: 'kannada' | 'english' | 'kanglish';
   target_number?: string;
 }): Promise<Call> {
-  const res = await fetch(`${API_BASE}/calls/start`, {
+  const base = getApiBase();
+  const res = await fetch(`${base}/calls/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -76,26 +103,30 @@ export async function startCall(data: {
 }
 
 export async function fetchCalls(taskId?: string): Promise<Call[]> {
-  const url = taskId ? `${API_BASE}/calls?task_id=${taskId}` : `${API_BASE}/calls`;
+  const base = getApiBase();
+  const url = taskId ? `${base}/calls?task_id=${taskId}` : `${base}/calls`;
   const res = await fetch(url);
   if (!res.ok) throw new Error('Failed to fetch calls');
   return res.json();
 }
 
 export async function fetchCall(callId: string): Promise<Call> {
-  const res = await fetch(`${API_BASE}/calls/${callId}`);
+  const base = getApiBase();
+  const res = await fetch(`${base}/calls/${callId}`);
   if (!res.ok) throw new Error('Failed to fetch call');
   return res.json();
 }
 
 export async function fetchTask(taskId: string): Promise<Task> {
-  const res = await fetch(`${API_BASE}/tasks/${taskId}`);
+  const base = getApiBase();
+  const res = await fetch(`${base}/tasks/${taskId}`);
   if (!res.ok) throw new Error('Failed to fetch task');
   return res.json();
 }
 
 export async function completeCall(callId: string, summary: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/calls/${callId}/complete?summary=${encodeURIComponent(summary)}`, {
+  const base = getApiBase();
+  const res = await fetch(`${base}/calls/${callId}/complete?summary=${encodeURIComponent(summary)}`, {
     method: 'POST',
   });
   if (!res.ok) throw new Error('Failed to complete call');
@@ -103,7 +134,8 @@ export async function completeCall(callId: string, summary: string): Promise<any
 }
 
 export async function postTranscriptEntry(callId: string, entry: any): Promise<any> {
-  const res = await fetch(`${API_BASE}/calls/${callId}/transcript`, {
+  const base = getApiBase();
+  const res = await fetch(`${base}/calls/${callId}/transcript`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(entry),

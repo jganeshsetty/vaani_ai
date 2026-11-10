@@ -64,99 +64,40 @@ export default function CallDetailsScreen({ params }: { params?: Promise<{ id: s
     })();
   }, [params]);
 
-  // Derive dynamic recipient name and context
+  // Derive dynamic recipient name and context from task description
   const taskDesc = task?.description || '';
-  const targetPhone = call?.target_number || task?.target_number || '+91 86600 39103';
+  const targetPhone = call?.target_number || task?.target_number || '';
 
-  const isGanesh =
-    taskDesc.toLowerCase().includes('ganesh') ||
-    targetPhone.includes('8660039103') ||
-    targetPhone.includes('86600 39103');
+  const recipientName =
+    taskDesc.toLowerCase().includes('ganesh') || targetPhone.includes('8660039103')
+      ? 'Ganesh'
+      : targetPhone
+      ? `Contact (${targetPhone})`
+      : 'Recipient';
 
-  const recipientName = isGanesh ? 'Ganesh' : 'Sri Manjunatha Electronics';
-  const callTag = isGanesh ? 'Personal Contact' : 'Vendor Call';
+  const callTag = taskDesc ? 'Voice AI Call' : 'Outbound Call';
 
-  // Derive dynamic summary
+  // Derive dynamic summary (only real summary, no mock)
   const summaryText =
     call?.summary ||
-    (isGanesh
-      ? `Call with Ganesh (${targetPhone}) completed successfully. Inquired if project was completed; Ganesh confirmed that the project is completely finished and all features are ready.`
-      : `Call with Sri Manjunatha Electronics completed successfully. Order #4892 is packed and scheduled for delivery by Friday morning via BlueDart.`);
+    (call?.status === 'completed'
+      ? 'Call completed successfully.'
+      : 'Call initiated. Awaiting summary from live conversation.');
 
-  // Derive dynamic transcript
+  // Derive dynamic transcript (only real transcript from backend)
   const transcriptTurns =
     call?.transcript && call.transcript.length > 0
-      ? call.transcript.map((entry: any, idx: number) => ({
+      ? call.transcript.map((entry: any) => ({
           role: entry.role === 'caller' || entry.role === 'agent' ? 'caller' : 'receiver',
-          speaker: entry.speaker || (entry.role === 'caller' || entry.role === 'agent' ? `${callerName} (Caller)` : recipientName),
+          speaker:
+            entry.speaker ||
+            (entry.role === 'caller' || entry.role === 'agent'
+              ? `${callerName} (Caller)`
+              : recipientName),
           kannada: entry.kannada || entry.text || '',
           english: entry.english || entry.text || '',
         }))
-      : isGanesh
-      ? [
-          {
-            role: 'receiver',
-            speaker: 'Ganesh (Recipient)',
-            kannada: 'ಹಲೋ, ಗಣೇಶ್ ಇಲ್ಲಿ, ಹೇಳಿ?',
-            english: 'Hello, Ganesh here, yes tell me?',
-          },
-          {
-            role: 'caller',
-            speaker: `${callerName} (Caller)`,
-            kannada: `ಹಲೋ, ನಮಸ್ತೆ! ನಾನು ${callerName}. ನಿನ್ನ ಪ್ರಾಜೆಕ್ಟ್ successfully complete ಆಯ್ತಾ ಅಂತ check ಮಾಡ್ಬೇಕಿತ್ತು.`,
-            english: `Hello! Hey, this is ${callerName}. Just wanted to check if your project was completed successfully.`,
-          },
-          {
-            role: 'receiver',
-            speaker: 'Ganesh (Recipient)',
-            kannada: 'ಹೌದು ಕಣ್ರೀ, project completely successfully finish ಆಗಿದೆ! All features and voice cloning perfectly work ಆಗ್ತಿದೆ.',
-            english: 'Yes! The project is completed successfully. All features and voice cloning are working perfectly.',
-          },
-          {
-            role: 'caller',
-            speaker: `${callerName} (Caller)`,
-            kannada: 'ಸೂಪರ್ ಕಣ್ರೀ, ತುಂಬಾ ಧನ್ಯವಾದಗಳು! Have a great day, ಬಾಯ್.',
-            english: 'Awesome, thank you so much! Have a great day, bye.',
-          },
-        ]
-      : [
-          {
-            role: 'receiver',
-            speaker: 'Girish (Store Manager)',
-            kannada: 'ಹಲೋ, ಶ್ರೀ ಮಂಜುನಾಥ ಎಲೆಕ್ಟ್ರಾನಿಕ್ಸ್, ಹೇಳಿ ಸರ್?',
-            english: 'Hello, Sri Manjunatha Electronics, how can I help you sir?',
-          },
-          {
-            role: 'caller',
-            speaker: `${callerName} (Caller)`,
-            kannada: `ಹಲೋ, ನಮಸ್ತೆ! ನಾನು ${callerName}, ಸಣ್ಣ ವಿಷಯ ಕೇಳ್ಬೇಕಿತ್ತು. ನನ್ನ ಆರ್ಡರ್ #4892 ಡಿಸ್ಪ್ಯಾಚ್ ಆಗಿದೆಯಾ?`,
-            english: `Hello! Namaskara, this is ${callerName}, just had a quick query. Has order #4892 been dispatched?`,
-          },
-          {
-            role: 'receiver',
-            speaker: 'Girish (Store Manager)',
-            kannada: 'ಹೌದು ಸರ್, ಇವತ್ತು ಬೆಳಗ್ಗೆ ಪ್ಯಾಕ್ ಆಗಿದೆ. ಇವತ್ತು ಸಂಜೆ ಕೊರಿಯರ್‌ಗೆ ಕೊಡುತ್ತೇವೆ.',
-            english: 'Yes sir, it was packed this morning. We will hand it over to the courier this evening.',
-          },
-          {
-            role: 'caller',
-            speaker: `${callerName} (Caller)`,
-            kannada: 'ಹೌದಾ? ಸೂಪರ್! Expected delivery date ಯಾವಾಗ ಸಿಗಬಹುದು? And what is the courier tracking partner?',
-            english: 'Oh awesome! When can we expect the delivery date? And who is the courier partner?',
-          },
-          {
-            role: 'receiver',
-            speaker: 'Girish (Store Manager)',
-            kannada: 'ನಾಳೆ ಸಂಜೆ ಅಥವಾ Friday morning ಡೆಲಿವರಿ ಆಗುತ್ತೆ. BlueDart ಮುಖಾಂತರ ಕಳಿಸ್ತೀವಿ.',
-            english: 'Delivery will be tomorrow evening or Friday morning via BlueDart.',
-          },
-          {
-            role: 'caller',
-            speaker: `${callerName} (Caller)`,
-            kannada: 'ಸರಿ ಕಣ್ರೀ, ತುಂಬಾ ಧನ್ಯವಾದಗಳು! Have a great day, ಬಾಯ್.',
-            english: 'Got it, thank you so much! Have a great day, bye.',
-          },
-        ];
+      : [];
 
   const handleCopy = () => {
     const text = `Call Details & Summary:
@@ -225,7 +166,7 @@ ${transcriptTurns.map((t) => `${t.speaker}: "${t.kannada}" (${t.english})`).join
           <div className="flex items-center gap-3.5">
             <div className="w-12 h-12 rounded-2xl bg-[#eaf2ec] flex items-center justify-center text-[#28543e] shrink-0">
               <span className="material-symbols-outlined text-2xl">
-                {isGanesh ? 'person' : 'storefront'}
+                {recipientName === 'Ganesh' ? 'person' : 'phone_in_talk'}
               </span>
             </div>
             <div>
@@ -322,53 +263,60 @@ ${transcriptTurns.map((t) => `${t.speaker}: "${t.kannada}" (${t.english})`).join
 
         {/* Dynamic Turns */}
         <div className="space-y-4 pt-2">
-          {transcriptTurns.map((turn, idx) => {
-            const isCaller = turn.role === 'caller';
-            return (
-              <div
-                key={idx}
-                className={`flex gap-3.5 max-w-[90%] sm:max-w-[80%] ${
-                  isCaller ? 'ml-auto flex-row-reverse' : ''
-                }`}
-              >
+          {transcriptTurns.length === 0 ? (
+            <div className="p-8 text-center text-[#717973] bg-[#faf9f6] rounded-2xl border border-[#eeece8]">
+              <span className="material-symbols-outlined text-3xl mb-1 text-[#28543e]">mic_none</span>
+              <p className="text-sm font-medium">No speech transcript recorded for this call yet.</p>
+            </div>
+          ) : (
+            transcriptTurns.map((turn, idx) => {
+              const isCaller = turn.role === 'caller';
+              return (
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-1 shadow-2xs ${
-                    isCaller
-                      ? 'bg-[#28543e] text-white'
-                      : 'bg-white border border-[#eeece8] text-[#58605c]'
+                  key={idx}
+                  className={`flex gap-3.5 max-w-[90%] sm:max-w-[80%] ${
+                    isCaller ? 'ml-auto flex-row-reverse' : ''
                   }`}
                 >
-                  {isCaller ? callerName[0]?.toUpperCase() || 'G' : recipientName[0]?.toUpperCase() || 'R'}
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-1 shadow-2xs ${
+                      isCaller
+                        ? 'bg-[#28543e] text-white'
+                        : 'bg-white border border-[#eeece8] text-[#58605c]'
+                    }`}
+                  >
+                    {isCaller ? callerName[0]?.toUpperCase() || 'G' : recipientName[0]?.toUpperCase() || 'R'}
+                  </div>
+
+                  <div
+                    className={`p-4 rounded-2xl text-xs sm:text-sm space-y-1.5 shadow-2xs ${
+                      isCaller
+                        ? 'bg-[#28543e] text-white rounded-tr-xs'
+                        : 'bg-[#faf9f6] text-[#1a1c1a] border border-[#eeece8] rounded-tl-xs'
+                    }`}
+                  >
+                    <div className="text-[11px] font-semibold opacity-80">{turn.speaker}</div>
+
+                    {(translationMode === 'both' || translationMode === 'kannada') && (
+                      <p className="font-medium leading-relaxed">{turn.kannada}</p>
+                    )}
+
+                    {(translationMode === 'both' || translationMode === 'english') && (
+                      <p
+                        className={`text-[12px] leading-relaxed pt-0.5 border-t ${
+                          isCaller
+                            ? 'text-white/80 border-white/20'
+                            : 'text-[#58605c] border-[#eeece8]'
+                        }`}
+                      >
+                        {turn.english}
+                      </p>
+                    )}
+                  </div>
                 </div>
-
-                <div
-                  className={`p-4 rounded-2xl text-xs sm:text-sm space-y-1.5 shadow-2xs ${
-                    isCaller
-                      ? 'bg-[#28543e] text-white rounded-tr-xs'
-                      : 'bg-[#faf9f6] text-[#1a1c1a] border border-[#eeece8] rounded-tl-xs'
-                  }`}
-                >
-                  <div className="text-[11px] font-semibold opacity-80">{turn.speaker}</div>
-
-                  {(translationMode === 'both' || translationMode === 'kannada') && (
-                    <p className="font-medium leading-relaxed">{turn.kannada}</p>
-                  )}
-
-                  {(translationMode === 'both' || translationMode === 'english') && (
-                    <p
-                      className={`text-[12px] leading-relaxed pt-0.5 border-t ${
-                        isCaller
-                          ? 'text-white/80 border-white/20'
-                          : 'text-[#58605c] border-[#eeece8]'
-                      }`}
-                    >
-                      {turn.english}
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
     </div>

@@ -10,10 +10,8 @@ export default function NewCallDashboard() {
   const [callerName, setCallerName] = useState('Ganesh');
   const [callerTone, setCallerTone] = useState<'informal' | 'formal'>('informal');
   const [countryCode, setCountryCode] = useState('+91');
-  const [phoneNumber, setPhoneNumber] = useState('98450 82194');
-  const [instructions, setInstructions] = useState(
-    'Call Sri Manjunatha Electronics in Malleshwaram. Ask if order #4892 with dry fruits and Mysore Pak is dispatched today.'
-  );
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [instructions, setInstructions] = useState('');
   const [languageMode, setLanguageMode] = useState<'auto' | 'kannada' | 'english' | 'kanglish'>('kannada');
   const [voiceProfile, setVoiceProfile] = useState('aarohi');
   const [customVoices, setCustomVoices] = useState<any[]>([]);
@@ -215,7 +213,7 @@ export default function NewCallDashboard() {
                 required
                 value={callerName}
                 onChange={(e) => handleCallerNameChange(e.target.value)}
-                placeholder="e.g. Ganesh, Sunil..."
+                placeholder="Enter your name (e.g. Ganesh)"
                 className="w-full sm:w-48 min-h-[44px] px-3.5 bg-white border border-[#eeece8] rounded-xl text-sm font-semibold text-[#1a1c1a] focus:ring-2 focus:ring-[#28543e]/20 outline-none transition"
               />
             </div>
@@ -279,7 +277,7 @@ export default function NewCallDashboard() {
                   required
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="98450 12345"
+                  placeholder="Enter number (e.g. 98450 12345)"
                   className="w-full min-h-[44px] px-3.5 bg-[#f6f5f2] border-0 rounded-xl text-sm font-medium text-[#1a1c1a] placeholder-[#717973] focus:bg-white focus:ring-2 focus:ring-[#28543e]/20 outline-none transition tracking-wide"
                 />
               </div>
@@ -299,41 +297,9 @@ export default function NewCallDashboard() {
               rows={3}
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
-              placeholder="Describe what to ask naturally..."
+              placeholder="Enter what to talk (e.g. Ask if my laptop is ready for pickup)..."
               className="w-full p-3.5 bg-[#f6f5f2] border-0 rounded-xl text-sm leading-relaxed text-[#1a1c1a] placeholder-[#717973] focus:bg-white focus:ring-2 focus:ring-[#28543e]/20 outline-none transition resize-none"
             />
-
-            {/* Responsive Suggestion Pills */}
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-[#717973] font-medium">Quick examples:</span>
-              <button
-                type="button"
-                onClick={() =>
-                  handleSuggestion('Call Sri Manjunatha Electronics and check if order #4892 has been dispatched.')
-                }
-                className="min-h-[36px] px-3 py-1.5 rounded-full bg-[#f6f5f2] hover:bg-[#eaf2ec] text-[#4d5550] hover:text-[#28543e] text-xs font-medium transition-colors"
-              >
-                Delivery status
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  handleSuggestion('Call the clinic and confirm my 5:30 PM appointment slot with the doctor.')
-                }
-                className="min-h-[36px] px-3 py-1.5 rounded-full bg-[#f6f5f2] hover:bg-[#eaf2ec] text-[#4d5550] hover:text-[#28543e] text-xs font-medium transition-colors"
-              >
-                Confirm appointment
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  handleSuggestion('Call the store and ask what time they close this evening.')
-                }
-                className="min-h-[36px] px-3 py-1.5 rounded-full bg-[#f6f5f2] hover:bg-[#eaf2ec] text-[#4d5550] hover:text-[#28543e] text-xs font-medium transition-colors"
-              >
-                Store closing hours
-              </button>
-            </div>
           </div>
 
           {/* Language Selector */}

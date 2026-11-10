@@ -27,6 +27,12 @@ from fastapi import WebSocket, WebSocketDisconnect
 from app.config import settings
 from app.models import CallStatus, Language
 from app.services import call_service, task_service
+from app.services.agentic_engine import (
+    AgentState,
+    build_followup,
+    build_opening_greeting,
+    build_summary,
+)
 from app.services.gnani_client import GnaniSTTClient, GnaniTTSClient
 
 logger = logging.getLogger("vaani.media")
@@ -60,6 +66,7 @@ class ExotelMediaHandler:
         self.stream_sid: Optional[str] = None
         self.call = None
         self.task = None
+        self.agent: Optional[AgentState] = None
 
         self.tts = GnaniTTSClient(language=Language.KANNADA, voice="Aarohi")
         self.stt = GnaniSTTClient(language=Language.KANNADA, sample_rate=GNANI_SAMPLE_RATE)
@@ -133,15 +140,19 @@ class ExotelMediaHandler:
 
                     await self._resolve_call_and_task(call_sid)
 
-                    recipient_name = "ಗಣೇಶ್"
-                    if self.task and self.task.description and "ganesh" not in self.task.description.lower():
-                        recipient_name = "ಸ್ನೇಹಿತರೆ"
+                    # Initialize AgentState with the user's custom task
+                    lang = self.task.language if self.task else Language.KANNADA
+                    self.agent = AgentState(
+                        task=self.task,
+                        call_id=self.call_id or "",
+                        language=lang,
+                    )
 
                     # Brief 400ms delay to ensure Exotel media bridge is open to handset
                     await asyncio.sleep(0.4)
 
-                    # Trigger opening Kanglish greeting:
-                    greeting = f"ಹಲೋ {recipient_name}, ನಿಮ್ಮ ಪ್ರಾಜೆಕ್ಟ್ ಸಕ್ಸಸ್‌ಫುಲ್ಲಾಗಿ ಕಂಪ್ಲೀಟ್ ಆಗಿದ್ಯಾ?"
+                    # Trigger dynamic opening greeting based on user's custom instruction
+                    greeting = build_opening_greeting(self.agent)
                     await self._speak(greeting)
 
                 elif event == "media":
@@ -216,27 +227,21 @@ class ExotelMediaHandler:
             })
 
         self.turns_count += 1
-        lower_trans = transcript.lower()
 
-        # Handle user requirements:
-        # 1. "while starting conversation, when the opposite person say, hello, the agent must start with the hello and continue"
-        # 2. Project confirmation
-        if "hello" in lower_trans or "ಹಲೋ" in lower_trans or "ನಮಸ್ಕಾರ" in lower_trans:
-            reply = "ಹಲೋ ಗಣೇಶ್ ಅವರೇ! ನಿಮ್ಮ ಪ್ರಾಜೆಕ್ಟ್ ಸಕ್ಸಸ್‌ಫುಲ್ಲಾಗಿ ಕಂಪ್ಲೀಟ್ ಆಗಿದ್ಯಾ?"
-            is_final = False
-        elif any(w in lower_trans for w in ["yes", "complete", "done", "ಹೌದು", "ಆಗಿದೆ", "ಮುಗಿದಿದೆ", "succes", "finish"]):
-            reply = "ತುಂಬಾ ಸಂತೋಷ ಗಣೇಶ್ ಅವರೇ! ಧನ್ಯವಾದಗಳು, ಕರೆ ಮುಕ್ತಾಯ ಮಾಡ್ತಿದ್ದೀನಿ. ನಮಸ್ಕಾರ!"
-            is_final = True
+        # Drive conversation using AgentState with user's instructions
+        reply = None
+        if self.agent:
+            reply = build_followup(self.agent, transcript)
         else:
-            reply = "ತುಂಬಾ ಧನ್ಯವಾದಗಳು ಗಣೇಶ್ ಅವರೇ, ನಮಸ್ಕಾರ!"
-            is_final = True
+            reply = "ತುಂಬಾ ಧನ್ಯವಾದಗಳು, ವಿವರ ತಿಳಿಸಿದ್ದಕ್ಕೆ. ನಮಸ್ಕಾರ!"
 
-        await self._speak(reply)
+        if reply:
+            await self._speak(reply)
 
-        if is_final or self.turns_count >= 3:
+        if (self.agent and self.agent.done) or self.turns_count >= 3:
             self.call_completed = True
             if self.call_id:
-                summary = f"Call completed with Ganesh (+91 86600 39103). User stated: '{transcript}'. Project status confirmed successfully."
+                summary = build_summary(self.agent) if self.agent else f"Call completed. Callee said: '{transcript}'."
                 await call_service.set_call_summary(self.call_id, summary)
             # Give Exotel handset 2.2 seconds to finish hearing the agent's concluding audio
             await asyncio.sleep(2.2)
@@ -298,7 +303,7 @@ class ExotelMediaHandler:
         """Finalize call status and summary in database."""
         logger.info("Finalizing media session for call %s", self.call_id)
         if self.call_id and not self.call_completed:
-            summary = f"Call completed with Ganesh (+91 86600 39103). Spoke directly in Kanglish/Kannada."
+            summary = build_summary(self.agent) if self.agent else "Call completed."
             await call_service.set_call_summary(self.call_id, summary)
 
 
