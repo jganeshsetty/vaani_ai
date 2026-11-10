@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: vaani-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: vaani
+      MONGO_INITDB_ROOT_PASSWORD: vaani
+      MONGO_INITDB_DATABASE: vaani_ai
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:

@@ -1,0 +1,40 @@
+services:
+  # 1. FastAPI Backend Service
+  - type: web
+    name: vaani-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: VAANI_HOST
+        value: 0.0.0.0
+      - key: VAANI_CORS_ORIGINS
+        value: "*"
+      - key: VAANI_MONGODB_URI
+        sync: false
+      - key: VAANI_MONGODB_DB
+        value: vaani_ai
+      - key: VAANI_EXOTEL_API_KEY
+        sync: false
+      - key: VAANI_EXOTEL_TOKEN
+        sync: false
+      - key: VAANI_EXOTEL_BASE_URL
+        value: https://api.exotel.com/v1
+      - key: VAANI_EXOTEL_VOICE_AI_SID
+        sync: false
+      - key: VAANI_GNANI_API_KEY
+        sync: false
+
+  # 2. Next.js Frontend Service
+  - type: web
+    name: vaani-frontend
+    runtime: node
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    autoDeploy: true
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        sync: false
