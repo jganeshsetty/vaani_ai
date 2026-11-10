@@ -38,6 +38,19 @@ SAMPLE_WIDTH = 2  # 16-bit
 CHANNELS = 1     # Mono
 
 
+def calculate_pcm16_rms(pcm_bytes: bytes) -> float:
+    """Calculate Root Mean Square (RMS) energy for 16-bit PCM."""
+    import math
+    import struct
+
+    count = len(pcm_bytes) // 2
+    if count == 0:
+        return 0.0
+    shorts = struct.unpack(f"<{count}h", pcm_bytes[: count * 2])
+    sum_squares = sum(s * s for s in shorts)
+    return float(math.sqrt(sum_squares / count))
+
+
 class ExotelMediaHandler:
     """Manages the full lifecycle of an Exotel Voice AI media stream."""
 
