@@ -17,7 +17,7 @@ function LiveCallContent() {
   const [task, setTask] = useState<Task | null>(null);
 
   const [seconds, setSeconds] = useState(0);
-  const [callStatus, setCallStatus] = useState<'calling' | 'ringing' | 'in_progress' | 'completed'>('calling');
+  const [callStatus, setCallStatus] = useState<'calling' | 'ringing' | 'in_progress' | 'completed' | 'failed'>('calling');
   const [callerName, setCallerName] = useState(callerParam);
   const [recipientName, setRecipientName] = useState(phoneParam ? `Recipient (${phoneParam})` : 'Recipient');
   const [targetNumber, setTargetNumber] = useState(phoneParam || 'Outgoing Line');
@@ -34,7 +34,7 @@ function LiveCallContent() {
 
   // Timer counting real seconds while call is in progress
   useEffect(() => {
-    if (callStatus === 'completed') return;
+    if (callStatus === 'completed' || callStatus === 'failed') return;
     const interval = setInterval(() => {
       setSeconds((prev) => prev + 1);
     }, 1000);
@@ -56,6 +56,12 @@ function LiveCallContent() {
         try {
           const callData = await fetchCall(callId);
           setCall(callData);
+
+          if (callData.status === 'failed') {
+            setCallStatus('failed');
+            return;
+          }
+
           if (callData.target_number) {
             setTargetNumber(callData.target_number);
             if (callData.target_number.includes('8660039103')) nameToDisplay = 'Ganesh';
@@ -79,12 +85,12 @@ function LiveCallContent() {
 
       // 2. Ringing on phone after 2 seconds
       setTimeout(() => {
-        setCallStatus('ringing');
+        setCallStatus((curr) => (curr === 'failed' ? 'failed' : 'ringing'));
       }, 2000);
 
       // 3. Connected on phone after 4.5 seconds
       setTimeout(() => {
-        setCallStatus('in_progress');
+        setCallStatus((curr) => (curr === 'failed' ? 'failed' : 'in_progress'));
       }, 4500);
     })();
   }, [callId, descParam, phoneParam]);
@@ -107,6 +113,53 @@ function LiveCallContent() {
       router.push(callId ? `/call/${callId}` : '/call/history');
     }, 400);
   };
+
+  if (callStatus === 'failed') {
+    return (
+      <div className="w-full min-h-[calc(100vh-120px)] flex items-center justify-center px-4 py-8 max-w-2xl mx-auto">
+        <div className="w-full bg-white rounded-3xl border border-amber-200 shadow-xl shadow-slate-900/5 p-6 sm:p-10 flex flex-col items-center text-center space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
+            <span className="material-symbols-outlined text-3xl">phone_disabled</span>
+          </div>
+
+          <div className="space-y-1.5">
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Call Could Not Connect</h2>
+            <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto">
+              {call?.summary || 'The telecom provider rejected this outbound call request.'}
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-amber-50 border border-amber-200/60 text-left text-xs text-slate-700 space-y-1.5 max-w-md w-full">
+            <p className="font-semibold text-slate-900 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-amber-600 text-base">info</span>
+              <span>Why did this happen?</span>
+            </p>
+            <p className="text-slate-600 leading-relaxed">
+              Exotel trial accounts operate under Department of Telecom KYC restrictions and can only dial numbers verified in your Exotel dashboard (such as your registered number <strong>+91 8660039103</strong>).
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md pt-2">
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard')}
+              className="flex-1 py-3 px-4 rounded-xl bg-primary-container text-white font-semibold text-sm hover:opacity-90 transition cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-base">arrow_back</span>
+              <span>Return to Dashboard</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push(callId ? `/call/${callId}` : '/call/history')}
+              className="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition cursor-pointer"
+            >
+              View Record
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full min-h-[calc(100vh-120px)] flex items-center justify-center px-4 py-8 max-w-2xl mx-auto">

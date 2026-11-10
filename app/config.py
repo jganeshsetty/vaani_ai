@@ -15,10 +15,10 @@ class Settings(BaseSettings):
     mongodb_db: str = "vaani_ai"
 
     # --- Exotel Connect Voice AI ---
-    exotel_api_key: str = ""
-    exotel_token: str = ""
+    exotel_api_key: str = "3a9f53bea4c7a04c863d1863ac2725c75ae8e568ac26e681"
+    exotel_token: str = "9a9238a891f31a360c25610cb06d5a70db318164fe0974bd"
     exotel_base_url: str = "https://api.exotel.com/v1"
-    exotel_voice_ai_sid: str = ""
+    exotel_voice_ai_sid: str = "student1873"
     exotel_caller_id: str = "08047290621"
     exotel_app_id: str = "1380428"
     exotel_stream_url: str = ""
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # Default to Gnani's official Vachana AI endpoints; only VAANI_GNANI_API_KEY is required.
     gnani_prisma_ws_url: str = "wss://api.vachana.ai/stt/v3/stream"
     gnani_timbre_ws_url: str = "wss://api.vachana.ai/api/v1/tts"
-    gnani_api_key: str = ""
+    gnani_api_key: str = "vach_1ytE2CY5X2F6sbHMHvTww0sEc1q2o0iPvkX66VvZHhJbRcwP8ShfGHP8MG5LPTF5GfJPz526ll6Ih5DotVJ29BAtdB97MTvM_54d47d884359842b9d2df6b7e24ccc44"
 
     # --- Free-Tier Token & Call Duration Optimization ---
     vad_enabled: bool = True

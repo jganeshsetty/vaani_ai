@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from typing import Optional
 
@@ -15,14 +16,24 @@ logger = logging.getLogger("vaani.exotel")
 
 
 def format_exotel_number(phone: str) -> str:
-    """Format an Indian phone number with leading 0 as required by Exotel."""
-    digits = re.sub(r"\D", "", phone)
-    if digits.startswith("91") and len(digits) == 12:
+    """Format an Indian phone number with leading 0 as required by Exotel.
+    
+    Accepts any format (+91 9845012345, 919845012345, 09845012345, 9845012345)
+    and formats it into standard 09845012345.
+    """
+    digits = re.sub(r"\D", "", phone or "")
+    if not digits:
+        return ""
+    if len(digits) == 13 and digits.startswith("910"):
+        return f"0{digits[3:]}"
+    if len(digits) == 12 and digits.startswith("91"):
         return f"0{digits[2:]}"
     if len(digits) == 10:
         return f"0{digits}"
-    if digits.startswith("0"):
+    if len(digits) == 11 and digits.startswith("0"):
         return digits
+    if len(digits) > 10:
+        return f"0{digits[-10:]}"
     return digits
 
 
@@ -52,18 +63,26 @@ async def trigger_exotel_call(
 
     url = f"{settings.exotel_base_url}/Accounts/{account_sid}/Calls/connect.json"
 
-    import os
-    stream_base = settings.exotel_stream_url
-    if not stream_base:
-        render_host = os.getenv("RENDER_EXTERNAL_HOSTNAME")
-        railway_host = os.getenv("RAILWAY_PUBLIC_DOMAIN")
-        fly_app = os.getenv("FLY_APP_NAME")
-        if render_host:
-            stream_base = f"wss://{render_host}"
-        elif railway_host:
-            stream_base = f"wss://{railway_host}"
-        elif fly_app:
-            stream_base = f"wss://{fly_app}.fly.dev"
+    # Resolve stream base URL for Exotel WebSocket callback
+    render_host = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+    render_url = os.getenv("RENDER_EXTERNAL_URL")
+    railway_host = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+    fly_app = os.getenv("FLY_APP_NAME")
+    public_url = os.getenv("PUBLIC_URL") or os.getenv("BACKEND_URL")
+
+    stream_base = ""
+    if render_url:
+        stream_base = render_url
+    elif render_host:
+        stream_base = f"wss://{render_host}"
+    elif railway_host:
+        stream_base = f"wss://{railway_host}"
+    elif fly_app:
+        stream_base = f"wss://{fly_app}.fly.dev"
+    elif public_url:
+        stream_base = public_url
+    elif settings.exotel_stream_url:
+        stream_base = settings.exotel_stream_url
 
     if stream_base:
         if stream_base.startswith("http://"):
@@ -71,7 +90,7 @@ async def trigger_exotel_call(
         elif stream_base.startswith("https://"):
             stream_base = "wss://" + stream_base[8:]
         elif not stream_base.startswith("ws"):
-            stream_base = f"wss://{stream_base}"
+            stream_base = f"wss://{stream_base.lstrip('/')}"
         
         ws_path = settings.media_ws_path
         stream_url = f"{stream_base.rstrip('/')}{ws_path}?call_id={call_id}"
@@ -100,7 +119,28 @@ async def trigger_exotel_call(
                 data=payload,
                 auth=(settings.exotel_api_key, settings.exotel_token),
             )
-            resp.raise_for_status()
+            
+            if resp.status_code != 200:
+                error_msg = resp.text
+                try:
+                    err_data = resp.json()
+                    if "RestException" in err_data:
+                        error_msg = err_data["RestException"].get("Message") or resp.text
+                except Exception:
+                    pass
+                
+                logger.error("Exotel returned %s for %s: %s", resp.status_code, number, error_msg)
+                
+                if resp.status_code == 403 and "KYC compliant" in error_msg:
+                    friendly_err = (
+                        "Exotel KYC Restriction: Exotel trial accounts only allow calling verified numbers "
+                        "(such as +91 8660039103) until KYC is completed. "
+                        "To dial other numbers, add them in your Exotel dashboard under 'Verified Numbers'."
+                    )
+                    raise RuntimeError(friendly_err)
+                
+                raise RuntimeError(f"Exotel error ({resp.status_code}): {error_msg}")
+
             data = resp.json()
             call_obj = data.get("Call", {})
             call_sid = call_obj.get("Sid")

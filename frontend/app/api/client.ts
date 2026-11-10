@@ -18,6 +18,13 @@ export function getApiBase(): string {
         const clean = envUrl.replace(/\/+$/, '');
         return clean.endsWith('/api') ? clean : `${clean}/api`;
       }
+
+      // Auto-detect Render deployment pair (e.g. vaani-frontend.onrender.com -> vaani-backend.onrender.com)
+      if (window.location.hostname.includes('.onrender.com')) {
+        const backendHost = window.location.hostname.replace('frontend', 'backend');
+        return `https://${backendHost}/api`;
+      }
+
       // Proxied through Next.js rewrites to backend
       return `${window.location.origin}/api`;
     }

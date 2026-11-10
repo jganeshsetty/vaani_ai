@@ -56,11 +56,14 @@ async def start_call(payload: CallStartRequest) -> CallOut:
     # Trigger Exotel single-leg outbound call
     try:
         await trigger_exotel_call(call.id, task, target_number=target, language=language)
+        fresh = await call_service.get_call(call.id)
+        return fresh or call
     except Exception as exc:  # pragma: no cover
-        logger.exception("Exotel trigger failed for call %s", call.id)
-        await call_service.set_call_failed(call.id, str(exc))
-
-    return call
+        err_msg = str(exc)
+        logger.warning("Exotel trigger failed for call %s: %s", call.id, err_msg)
+        await call_service.set_call_failed(call.id, err_msg)
+        fresh = await call_service.get_call(call.id)
+        return fresh or call
 
 
 @router.get("/calls/{call_id}", response_model=CallOut)

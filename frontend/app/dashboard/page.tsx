@@ -154,6 +154,12 @@ export default function NewCallDashboard() {
         language: task.language,
       });
 
+      if (call.status === 'failed') {
+        const errorReason = call.summary || 'Exotel telecom failed to initiate the call.';
+        setError(errorReason);
+        return;
+      }
+
       // 3. Navigate to live call screen with full context
       router.push(
         `/dashboard/live?call_id=${call.id}&caller=${encodeURIComponent(callerName)}&phone=${encodeURIComponent(
@@ -162,12 +168,8 @@ export default function NewCallDashboard() {
       );
     } catch (err: any) {
       console.warn('Backend call trigger failed or fallback:', err);
-      // Fallback navigation with complete state
-      router.push(
-        `/dashboard/live?mock=true&phone=${encodeURIComponent(fullNumber)}&desc=${encodeURIComponent(
-          personaInstruction
-        )}&caller=${encodeURIComponent(callerName)}`
-      );
+      const errMsg = err?.message || 'Failed to connect to backend server.';
+      setError(errMsg);
     } finally {
       setLoading(false);
     }
@@ -193,9 +195,50 @@ export default function NewCallDashboard() {
       <div className="bg-white rounded-2xl border border-[#e2e7ff] shadow-xl shadow-slate-900/5 p-5 sm:p-7 md:p-8">
         <form className="space-y-6" onSubmit={handleInitiateCall}>
           {error && (
-            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 flex items-center gap-2">
-              <span className="material-symbols-outlined text-red-600 text-base">error</span>
-              <span>{error}</span>
+            <div className="p-4 rounded-xl bg-amber-50/80 border border-amber-200 text-sm text-slate-800 space-y-3">
+              <div className="flex items-start gap-2.5">
+                <span className="material-symbols-outlined text-amber-600 text-xl shrink-0 mt-0.5">warning</span>
+                <div className="space-y-1">
+                  <p className="font-semibold text-slate-900">
+                    {error.includes('KYC') ? 'Telecom Provider (Exotel) Notice' : 'Call Initiation Notice'}
+                  </p>
+                  <p className="text-xs text-slate-600 leading-relaxed">{error}</p>
+                </div>
+              </div>
+
+              {(error.includes('KYC') || error.includes('verified')) && (
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-amber-200/60">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhoneNumber('8660039103');
+                      setError(null);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-primary-container text-white text-xs font-semibold hover:opacity-90 transition cursor-pointer shadow-xs flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-sm">verified</span>
+                    <span>Switch to Verified Number (8660039103)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const fullNumber = `${countryCode}${phoneNumber.replace(/\D/g, '')}`;
+                      const personaInstruction =
+                        callerTone === 'informal'
+                          ? `Speak casually as ${callerName} in friendly conversational style: ${instructions}`
+                          : `Speak politely as ${callerName}: ${instructions}`;
+                      router.push(
+                        `/dashboard/live?mock=true&phone=${encodeURIComponent(fullNumber)}&desc=${encodeURIComponent(
+                          personaInstruction
+                        )}&caller=${encodeURIComponent(callerName)}`
+                      );
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition cursor-pointer"
+                  >
+                    Test Online Simulation
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -254,9 +297,19 @@ export default function NewCallDashboard() {
 
           {/* Phone Number Input */}
           <div>
-            <label className="block text-sm font-semibold text-[#131b2e] mb-2" htmlFor="phone-input">
-              Target Phone Number
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-semibold text-[#131b2e]" htmlFor="phone-input">
+                Target Phone Number
+              </label>
+              <button
+                type="button"
+                onClick={() => setPhoneNumber('8660039103')}
+                className="text-xs font-semibold text-primary hover:text-primary-container flex items-center gap-1 cursor-pointer transition"
+              >
+                <span className="material-symbols-outlined text-[15px]">verified</span>
+                <span>Use Verified Number (8660039103)</span>
+              </button>
+            </div>
             <div className="flex flex-col sm:flex-row gap-2.5">
               <div className="relative w-full sm:w-36 flex-shrink-0">
                 <select
@@ -286,6 +339,12 @@ export default function NewCallDashboard() {
                 />
               </div>
             </div>
+            <p className="text-[11px] text-[#464555] mt-1.5 flex items-center gap-1">
+              <span className="material-symbols-outlined text-[14px] text-amber-600">info</span>
+              <span>
+                <strong>Exotel Trial Limitation:</strong> Calls are routed via Exotel trial line (08047290621). Under telecom KYC rules, trial accounts only dial numbers verified in your Exotel dashboard.
+              </span>
+            </p>
           </div>
 
           {/* Task Instructions */}
