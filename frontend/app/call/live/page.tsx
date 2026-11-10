@@ -110,20 +110,20 @@ function LiveCallContent() {
 
   return (
     <div className="w-full min-h-[calc(100vh-120px)] flex items-center justify-center px-4 py-8 max-w-2xl mx-auto">
-      <div className="w-full bg-white rounded-3xl border border-[#eeece8] shadow-[0_8px_32px_rgba(40,84,62,0.06)] p-6 sm:p-10 flex flex-col items-center text-center space-y-6">
+      <div className="w-full bg-white rounded-3xl border border-[#e2e7ff] shadow-xl shadow-slate-900/5 p-6 sm:p-10 flex flex-col items-center text-center space-y-6">
         
         {/* Animated Phone Status Radar */}
         <div className="relative flex items-center justify-center my-4">
           <div
             className={`w-32 h-32 sm:w-40 sm:h-40 rounded-full flex items-center justify-center transition-all duration-700 ${
               callStatus === 'in_progress'
-                ? 'bg-[#eaf2ec] ring-8 ring-[#28543e]/10 animate-pulse'
+                ? 'bg-[#e2dfff] ring-8 ring-primary-container/20 animate-pulse'
                 : callStatus === 'ringing'
-                ? 'bg-amber-50 ring-8 ring-amber-400/20 animate-pulse'
-                : 'bg-emerald-50 ring-8 ring-emerald-400/20'
+                ? 'bg-amber-100/60 ring-8 ring-amber-300/40 animate-pulse'
+                : 'bg-blue-100/60 ring-8 ring-blue-300/40'
             }`}
           >
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#28543e] text-white flex items-center justify-center shadow-md">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-primary-container text-white flex items-center justify-center shadow-md shadow-primary-container/30">
               <span className="material-symbols-outlined text-4xl sm:text-5xl">
                 {callStatus === 'completed' ? 'call_end' : 'phone_in_talk'}
               </span>
@@ -133,14 +133,14 @@ function LiveCallContent() {
 
         {/* Recipient and Call Information */}
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-[#eaf2ec] text-[#28543e]">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-[#e2dfff] text-primary">
             <span
               className={`w-2 h-2 rounded-full ${
                 callStatus === 'in_progress'
-                  ? 'bg-[#28543e] animate-ping'
+                  ? 'bg-primary-container animate-ping'
                   : callStatus === 'ringing'
                   ? 'bg-amber-500 animate-ping'
-                  : 'bg-emerald-600'
+                  : 'bg-blue-600'
               }`}
             />
             <span className="capitalize">
@@ -154,37 +154,37 @@ function LiveCallContent() {
             </span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#1a1c1a] tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#131b2e] tracking-tight">
             {recipientName}
           </h1>
 
-          <p className="text-base sm:text-lg font-mono font-medium text-[#58605c]">
+          <p className="text-base sm:text-lg font-mono font-medium text-[#464555]">
             {targetNumber}
           </p>
         </div>
 
         {/* Live Call Duration */}
-        <div className="p-3.5 px-6 rounded-2xl bg-[#faf9f6] border border-[#e2e1dd] inline-flex items-center gap-2">
-          <span className="material-symbols-outlined text-[#717973] text-lg">timer</span>
-          <span className="text-xs font-semibold text-[#717973]">Duration:</span>
-          <span className="font-mono text-base font-bold text-[#1a1c1a]">
+        <div className="p-3.5 px-6 rounded-2xl bg-[#f2f3ff] border border-[#eaedff] inline-flex items-center gap-2">
+          <span className="material-symbols-outlined text-[#777587] text-lg">timer</span>
+          <span className="text-xs font-semibold text-[#777587]">Duration:</span>
+          <span className="font-mono text-base font-bold text-[#131b2e]">
             {mins}:{secs}
           </span>
         </div>
 
         {/* Calling Persona Info Card */}
-        <div className="w-full p-4 rounded-2xl bg-[#faf9f6] border border-[#eeece8] text-left space-y-1.5 text-xs text-[#58605c]">
+        <div className="w-full p-4 rounded-2xl bg-[#f2f3ff] border border-[#eaedff] text-left space-y-1.5 text-xs text-[#464555]">
           <div className="flex justify-between items-center">
-            <span className="font-semibold text-[#1a1c1a]">Calling As:</span>
-            <span className="font-bold text-[#28543e]">{callerName}</span>
+            <span className="font-semibold text-[#131b2e]">Calling As:</span>
+            <span className="font-bold text-primary">{callerName}</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="font-semibold text-[#1a1c1a]">Telephony Line:</span>
-            <span className="font-mono text-[#717973]">ExoPhone (08047290621)</span>
+            <span className="font-semibold text-[#131b2e]">Telephony Line:</span>
+            <span className="font-mono text-[#777587]">ExoPhone (08047290621)</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="font-semibold text-[#1a1c1a]">Audio Stream:</span>
-            <span className="text-emerald-700 font-semibold">Active on Recipient Handset</span>
+            <span className="font-semibold text-[#131b2e]">Audio Stream:</span>
+            <span className="text-primary font-semibold">Active on Recipient Handset</span>
           </div>
         </div>
 
@@ -208,8 +208,8 @@ export default function LiveCallPage() {
   return (
     <Suspense
       fallback={
-        <div className="p-12 text-center text-[#717973]">
-          <span className="material-symbols-outlined text-4xl animate-spin">refresh</span>
+        <div className="p-12 text-center text-[#777587]">
+          <span className="material-symbols-outlined text-4xl animate-spin text-primary">refresh</span>
           <p className="mt-2 text-sm font-medium">Connecting call screen...</p>
         </div>
       }

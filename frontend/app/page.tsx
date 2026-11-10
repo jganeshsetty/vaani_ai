@@ -1,446 +1,706 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { createTask, startCall } from '@/app/api/client';
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 
-export default function NewCallDashboard() {
-  const router = useRouter();
+interface Scenario {
+  title: string;
+  lang: string;
+  dialogue: { speaker: string; text: string; role?: 'agent' | 'resp' | 'summary' }[];
+}
 
-  const [callerName, setCallerName] = useState('Ganesh');
-  const [callerTone, setCallerTone] = useState<'informal' | 'formal'>('informal');
-  const [countryCode, setCountryCode] = useState('+91');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [instructions, setInstructions] = useState('');
-  const [languageMode, setLanguageMode] = useState<'auto' | 'kannada' | 'english' | 'kanglish'>('kannada');
-  const [voiceProfile, setVoiceProfile] = useState('aarohi');
-  const [customVoices, setCustomVoices] = useState<any[]>([]);
-  const [consent, setConsent] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [playingVoice, setPlayingVoice] = useState<string | null>(null);
+const SCENARIOS: Record<string, Scenario> = {
+  logistics: {
+    title: 'Courier Delivery Confirmation',
+    lang: 'Kanglish Dialect',
+    dialogue: [
+      {
+        speaker: 'VaaniCall',
+        text: 'Hello, order #4892 dispatch aagidya? Delivery timing yavaga?',
+        role: 'agent',
+      },
+      {
+        speaker: 'Respondent',
+        text: 'Ha sir, already dispatched through BlueDart. Tomorrow afternoon 1 PM deliver aagutthe.',
+        role: 'resp',
+      },
+      {
+        speaker: 'Structured Extraction',
+        text: 'Status: In Transit • ETA: Tomorrow 13:00 • Courier: BlueDart',
+        role: 'summary',
+      },
+    ],
+  },
+  doctor: {
+    title: 'Clinic Slot Rescheduling',
+    lang: 'Pure Kannada',
+    dialogue: [
+      {
+        speaker: 'VaaniCall',
+        text: 'ನಮಸ್ಕಾರ, ಡಾಕ್ಟರ್ ರಾವ್ ಅವರ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಶುಕ್ರವಾರ ಬೆಳಿಗ್ಗೆ 10 ಗಂಟೆಗೆ ಬದಲಾಯಿಸಬಹುದೇ?',
+        role: 'agent',
+      },
+      {
+        speaker: 'Receptionist',
+        text: 'ಹೌದು, ಶುಕ್ರವಾರ 10:30 AM ಸ್ಲಾಟ್ ಖಾಲಿ ಇದೆ. ಬುಕ್ ಮಾಡಿದ್ದೀವಿ.',
+        role: 'resp',
+      },
+      {
+        speaker: 'Structured Extraction',
+        text: 'Clinic: Dr. Rao • New Slot: Friday 10:30 AM • Confirmed: Yes',
+        role: 'summary',
+      },
+    ],
+  },
+  hardware: {
+    title: 'Store Inventory Check',
+    lang: 'Indian English',
+    dialogue: [
+      {
+        speaker: 'VaaniCall',
+        text: 'Hi, calling to verify if you have 50 bags of Ultratech Cement in ready stock?',
+        role: 'agent',
+      },
+      {
+        speaker: 'Shop Owner',
+        text: 'Yes sir, stock is available in our main warehouse. Can dispatch in 2 hours.',
+        role: 'resp',
+      },
+      {
+        speaker: 'Structured Extraction',
+        text: 'Item: Ultratech Cement • Quantity: 50+ Bags • Dispatch: Ready',
+        role: 'summary',
+      },
+    ],
+  },
+};
 
-  // Sync with localStorage on mount
+export default function LandingPage() {
+  const [activeScenario, setActiveScenario] = useState<string>('logistics');
+  const [seconds, setSeconds] = useState(42);
+
+  // Live seconds ticker for simulation card
   useEffect(() => {
-    try {
-      const savedName = localStorage.getItem('vaani_caller_name');
-      if (savedName) setCallerName(savedName);
-
-      const savedTone = localStorage.getItem('vaani_caller_tone');
-      if (savedTone === 'formal' || savedTone === 'informal') setCallerTone(savedTone);
-
-      const savedVoices = localStorage.getItem('vaani_custom_voices');
-      if (savedVoices) {
-        const parsed = JSON.parse(savedVoices);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setCustomVoices(parsed);
-        }
-      }
-    } catch (e) {
-      // Ignore local storage error
-    }
+    const timer = setInterval(() => {
+      setSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
   }, []);
 
-  const handleCallerNameChange = (name: string) => {
-    setCallerName(name);
-    try {
-      localStorage.setItem('vaani_caller_name', name);
-    } catch (e) {}
-  };
+  const minsStr = String(Math.floor(seconds / 60)).padStart(2, '0');
+  const secsStr = String(seconds % 60).padStart(2, '0');
 
-  const handleCallerToneChange = (tone: 'informal' | 'formal') => {
-    setCallerTone(tone);
-    try {
-      localStorage.setItem('vaani_caller_tone', tone);
-    } catch (e) {}
-  };
+  const scenarioData = SCENARIOS[activeScenario] || SCENARIOS.logistics;
 
-  const handleSuggestion = (promptText: string) => {
-    setInstructions(promptText);
-  };
-
-  // Real browser sound preview (Web Audio melodic tone + Speech)
-  const playSampleAudio = (voiceId: string) => {
-    try {
-      if (playingVoice === voiceId) {
-        window.speechSynthesis?.cancel();
-        setPlayingVoice(null);
-        return;
-      }
-
-      setPlayingVoice(voiceId);
-
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = voiceId === 'sunil' ? 'triangle' : 'sine';
-      osc.frequency.setValueAtTime(voiceId === 'sunil' ? 220 : 340, ctx.currentTime);
-      gain.gain.setValueAtTime(0.12, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.35);
-
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const text =
-          voiceId === 'sunil' || voiceId === 'custom'
-            ? `ಹೇ, ನಮಸ್ತೆ! ನಾನು ${callerName}. ಆರಾಮಾಗಿದ್ದೀರಾ?`
-            : `ನಮಸ್ಕಾರ, ನಾನು ಆರೋಹಿ. ನಿಮ್ಮ ಕೆಲಸವನ್ನು ನಾನು ಮಾತನಾಡುತ್ತೇನೆ.`;
-
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.0;
-        utterance.pitch = voiceId === 'sunil' ? 0.9 : 1.15;
-        utterance.onend = () => setPlayingVoice(null);
-        utterance.onerror = () => setPlayingVoice(null);
-        window.speechSynthesis.speak(utterance);
-      } else {
-        setTimeout(() => setPlayingVoice(null), 1200);
-      }
-    } catch (e) {
-      console.warn('Audio preview error:', e);
-      setPlayingVoice(null);
-    }
-  };
-
-  const handleInitiateCall = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phoneNumber.trim()) {
-      setError('Please enter a valid phone number');
-      return;
-    }
-    if (!instructions.trim()) {
-      setError('Please specify what the caller should ask');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    const fullNumber = phoneNumber.startsWith('+') ? phoneNumber : `${countryCode}${phoneNumber.replace(/\s+/g, '')}`;
-
-    // Persona-injected instructions ensuring informal conversational flow as the human
-    const personaInstruction =
-      callerTone === 'informal'
-        ? `[CALLER_PERSONA: Speak informally as ${callerName}. NEVER introduce as an AI or VaaniCall. Chat casually and naturally.] ${instructions}`
-        : `[CALLER_PERSONA: Speak politely as ${callerName}.] ${instructions}`;
-
-    try {
-      // 1. Create task in FastAPI backend
-      const task = await createTask({
-        user_id: callerName.toLowerCase().replace(/\s+/g, '_'),
-        description: personaInstruction,
-        language: languageMode === 'auto' ? 'kannada' : languageMode,
-        target_number: fullNumber,
-        constraints: [
-          callerTone === 'informal'
-            ? 'speak casually without robotic words, never mention AI'
-            : 'be polite and clear in Kannada/English',
-        ],
-        questions_to_ask: [instructions],
-      });
-
-      // 2. Start call
-      const call = await startCall({
-        task_id: task.id,
-        target_number: fullNumber,
-        language: task.language,
-      });
-
-      // 3. Navigate to live call screen with full context
-      router.push(
-        `/call/live?call_id=${call.id}&caller=${encodeURIComponent(callerName)}&phone=${encodeURIComponent(
-          fullNumber
-        )}&desc=${encodeURIComponent(instructions)}`
-      );
-    } catch (err: any) {
-      console.warn('Backend call trigger failed or fallback:', err);
-      // Fallback navigation with complete state
-      router.push(
-        `/call/live?mock=true&phone=${encodeURIComponent(fullNumber)}&desc=${encodeURIComponent(
-          personaInstruction
-        )}&caller=${encodeURIComponent(callerName)}`
-      );
-    } finally {
-      setLoading(false);
-    }
+  const scrollToHowItWorks = () => {
+    const el = document.getElementById('how-it-works');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
-    <div className="w-full px-3.5 sm:px-6 lg:px-8 py-6 sm:py-10 max-w-3xl mx-auto">
-      {/* Friendly Hero */}
-      <div className="text-center mb-6 sm:mb-8">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#eaf2ec] text-[#28543e] text-xs font-semibold mb-3">
-          <span className="w-2 h-2 rounded-full bg-[#28543e] animate-pulse" />
-          <span>Informal Persona • Converses as You</span>
+    <div className="min-h-screen bg-[#faf8ff] text-[#131b2e] font-sans selection:bg-primary-container selection:text-white">
+      {/* Fixed Sticky Header */}
+      <header className="fixed top-0 left-0 right-0 w-full z-50 bg-[#faf8ff]/90 backdrop-blur-xl border-b border-[#e2e7ff] shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
+        <div className="h-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <Link href="/" className="flex items-center gap-2.5 group">
+              <div className="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center text-white shadow-md shadow-primary-container/20 group-hover:bg-primary transition-all">
+                <span className="material-symbols-outlined text-[22px]">phone_in_talk</span>
+              </div>
+              <span className="font-extrabold text-xl tracking-tight text-[#131b2e]">VaaniCall AI</span>
+            </Link>
+            <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#e2dfff] text-primary">
+              Multilingual Voice AI
+            </span>
+          </div>
+
+          <nav className="hidden md:flex items-center gap-8">
+            <a href="#features" className="text-[#464555] hover:text-[#131b2e] text-sm font-medium transition-colors">
+              Features
+            </a>
+            <a href="#how-it-works" className="text-[#464555] hover:text-[#131b2e] text-sm font-medium transition-colors">
+              How It Works
+            </a>
+            <a href="#playground" className="text-[#464555] hover:text-[#131b2e] text-sm font-medium transition-colors">
+              Simulation
+            </a>
+          </nav>
+
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="px-4 py-2 rounded-xl text-sm font-semibold text-[#131b2e] hover:bg-[#e2e7ff] transition-colors"
+            >
+              Login
+            </Link>
+            <Link
+              href="/login"
+              className="px-4 sm:px-5 py-2.5 rounded-xl text-sm font-semibold bg-primary-container hover:bg-primary text-white shadow-md shadow-primary-container/20 transition-all active:scale-[0.98]"
+            >
+              Get Started
+            </Link>
+          </div>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-[#1a1c1a] tracking-tight">
-          What call would you like me to make?
-        </h1>
-        <p className="text-sm sm:text-[15px] text-[#58605c] mt-2 max-w-lg mx-auto leading-relaxed">
-          Speaks directly as you in natural, informal Kannada or English without any AI robotic clichés.
-        </p>
-      </div>
+      </header>
 
-      {/* Main Card */}
-      <div className="bg-white rounded-2xl border border-[#eeece8] shadow-[0_4px_24px_rgba(40,84,62,0.04)] p-4 sm:p-7 md:p-8">
-        <form className="space-y-6" onSubmit={handleInitiateCall}>
-          {error && (
-            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 flex items-center gap-2">
-              <span className="material-symbols-outlined text-red-600 text-base">error</span>
-              <span>{error}</span>
+      {/* Main Content */}
+      <main className="w-full pt-20">
+        {/* Hero Section */}
+        <div className="relative w-full overflow-hidden">
+          {/* Subtle Ambient Glow */}
+          <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-gradient-to-b from-indigo-200/40 via-blue-100/30 to-transparent blur-3xl opacity-80"></div>
+
+          <section className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 pt-10 pb-20 lg:pt-16 lg:pb-28">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+              {/* Left Column: Copy & Actions */}
+              <div className="lg:col-span-7 flex flex-col items-start text-left">
+                {/* Top Badge */}
+                <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#e2dfff] text-primary text-xs sm:text-sm font-medium mb-6 shadow-xs">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-container opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary-container"></span>
+                  </span>
+                  <span className="font-semibold">Autonomous Multilingual Voice Engine • Powered by Gnani AI</span>
+                </div>
+
+                {/* Main Headline */}
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-[#131b2e] mb-6 leading-[1.12]">
+                  Your Autonomous <br className="hidden sm:inline" />
+                  <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                    Multilingual
+                  </span>{' '}
+                  Calling Assistant
+                </h1>
+
+                {/* Subheadline */}
+                <p className="text-base sm:text-lg text-[#464555] max-w-2xl mb-8 leading-relaxed">
+                  Delegate your phone calls to an intelligent AI agent that speaks fluent Kannada, English, and natural
+                  Kanglish. Give it a task, and receive verified summaries in seconds.
+                </p>
+
+                {/* CTA Action Buttons */}
+                <div className="flex flex-wrap items-center gap-4 w-full sm:w-auto">
+                  <Link
+                    href="/login"
+                    className="group inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl font-semibold text-base bg-primary-container text-white hover:bg-primary transition-all duration-200 shadow-md hover:shadow-lg hover:shadow-primary-container/20 active:scale-[0.99] cursor-pointer"
+                  >
+                    <span>Get Started Free</span>
+                    <span className="material-symbols-outlined text-[20px] transition-transform duration-200 group-hover:translate-x-1">
+                      arrow_forward
+                    </span>
+                  </Link>
+                  <button
+                    onClick={scrollToHowItWorks}
+                    type="button"
+                    className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl font-semibold text-base bg-[#f2f3ff] text-[#131b2e] hover:bg-[#eaedff] transition-colors shadow-xs cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-primary text-[22px]">play_circle</span>
+                    <span>See How It Calls</span>
+                  </button>
+                </div>
+
+                {/* Micro Metrics */}
+                <div className="mt-10 pt-8 border-t border-[#dae2fd] flex flex-wrap items-center gap-8 w-full">
+                  <div className="flex flex-col">
+                    <span className="text-2xl sm:text-3xl font-bold text-[#131b2e]">&lt;280ms</span>
+                    <span className="text-xs uppercase tracking-wider text-[#464555] mt-0.5">Real-Time Turn Latency</span>
+                  </div>
+                  <div className="w-px h-8 bg-[#dae2fd]"></div>
+                  <div className="flex flex-col">
+                    <span className="text-2xl sm:text-3xl font-bold text-[#131b2e]">3-Way</span>
+                    <span className="text-xs uppercase tracking-wider text-[#464555] mt-0.5">Dynamic Code-Mixing</span>
+                  </div>
+                  <div className="w-px h-8 bg-[#dae2fd]"></div>
+                  <div className="flex flex-col">
+                    <span className="text-2xl sm:text-3xl font-bold text-[#131b2e]">100%</span>
+                    <span className="text-xs uppercase tracking-wider text-[#464555] mt-0.5">Autonomous Resolution</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Live Phone Call Simulator Card */}
+              <div className="lg:col-span-5 relative w-full">
+                <div className="absolute -inset-1 rounded-3xl bg-gradient-to-tr from-primary-container/15 to-secondary-container/15 blur-xl opacity-80 pointer-events-none"></div>
+
+                <div className="relative w-full rounded-2xl bg-white border border-[#e2e7ff] p-6 shadow-xl shadow-slate-900/5">
+                  {/* Call Header */}
+                  <div className="flex items-center justify-between pb-4 mb-5 border-b border-[#eaedff]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-[#e2dfff] flex items-center justify-center text-primary">
+                        <span className="material-symbols-outlined text-[20px]">storefront</span>
+                      </div>
+                      <div>
+                        <div className="font-bold text-sm sm:text-base text-[#131b2e] leading-tight">
+                          Sri Manjunatha Electronics
+                        </div>
+                        <div className="text-xs text-[#464555]">+91 98450 ••••• • Indiranagar</div>
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#c9e6ff] text-[#004c6e]">
+                      <span className="w-2 h-2 rounded-full bg-[#006591] animate-pulse"></span>
+                      <span>Kanglish AI</span>
+                    </span>
+                  </div>
+
+                  {/* Telemetry Stream */}
+                  <div className="rounded-xl bg-[#f2f3ff] p-4 mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-[18px]">
+                          record_voice_over
+                        </span>
+                        <span className="text-xs uppercase font-semibold text-primary">
+                          Live Synthetic Stream
+                        </span>
+                      </div>
+                      <span className="text-xs font-mono text-[#464555]">
+                        {minsStr}:{secsStr}
+                      </span>
+                    </div>
+
+                    {/* Animated Audio Visualizer */}
+                    <div className="h-10 flex items-center justify-between gap-1 px-2 bg-white rounded-lg border border-[#e2e7ff]/60">
+                      <div className="w-1.5 bg-primary-container rounded-full h-3 animate-pulse"></div>
+                      <div className="w-1.5 bg-primary-container rounded-full h-6 animate-pulse" style={{ animationDelay: '100ms' }}></div>
+                      <div className="w-1.5 bg-tertiary-container rounded-full h-8 animate-pulse" style={{ animationDelay: '200ms' }}></div>
+                      <div className="w-1.5 bg-primary rounded-full h-4 animate-pulse" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-1.5 bg-secondary rounded-full h-7 animate-pulse" style={{ animationDelay: '300ms' }}></div>
+                      <div className="w-1.5 bg-primary-container rounded-full h-9 animate-pulse" style={{ animationDelay: '250ms' }}></div>
+                      <div className="w-1.5 bg-tertiary rounded-full h-5 animate-pulse" style={{ animationDelay: '180ms' }}></div>
+                      <div className="w-1.5 bg-primary-container rounded-full h-8 animate-pulse" style={{ animationDelay: '320ms' }}></div>
+                      <div className="w-1.5 bg-secondary-container rounded-full h-6 animate-pulse" style={{ animationDelay: '90ms' }}></div>
+                      <div className="w-1.5 bg-primary rounded-full h-3 animate-pulse" style={{ animationDelay: '210ms' }}></div>
+                      <div className="w-1.5 bg-primary-container rounded-full h-7 animate-pulse" style={{ animationDelay: '140ms' }}></div>
+                      <div className="w-1.5 bg-tertiary-container rounded-full h-4 animate-pulse" style={{ animationDelay: '280ms' }}></div>
+                    </div>
+                  </div>
+
+                  {/* Dialogue Stream */}
+                  <div className="space-y-3 mb-5">
+                    {/* Agent Bubble */}
+                    <div className="p-3.5 rounded-xl bg-[#f2f3ff] border-l-4 border-tertiary-container">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-primary">VaaniCall Agent</span>
+                        <span className="text-xs text-[#464555]">00:18</span>
+                      </div>
+                      <p className="text-sm text-[#131b2e] leading-snug">
+                        &ldquo;ನಮಸ್ಕಾರ, ನಾನು ಸುನಿಲ್ ಅವರ ಪರವಾಗಿ ಕರೆ ಮಾಡುತ್ತಿದ್ದೇನೆ. Order #4892 dispatch ಆಗಿದೆಯಾ ಅಂತ verify ಮಾಡೋದಿಕ್ಕೆ.&rdquo;
+                      </p>
+                      <p className="text-xs text-[#464555] italic mt-1">
+                        (Namaskara, calling on behalf of Sunil to verify if order #4892 was dispatched.)
+                      </p>
+                    </div>
+
+                    {/* Respondent Bubble */}
+                    <div className="p-3.5 rounded-xl bg-white border border-[#e2e7ff] shadow-xs">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-[#131b2e]">Store Manager</span>
+                        <span className="text-xs text-[#464555]">00:34</span>
+                      </div>
+                      <p className="text-sm text-[#131b2e] leading-snug">
+                        &ldquo;ಹೌದು ಸರ್, BlueDart courier ge handover maadidivi. Friday 1:00 PM olage deliver aagutthe.&rdquo;
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Verified Structured Outcome */}
+                  <div className="p-3.5 rounded-xl bg-[#e2dfff]/40 border border-[#e2dfff] flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-primary-container flex items-center justify-center flex-shrink-0 text-white mt-0.5">
+                      <span className="material-symbols-outlined text-[16px]">done_all</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-primary">Objective Verified</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary text-white">
+                          Dispatched
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#131b2e] mt-1 font-medium">
+                        Carrier: BlueDart (AWB: #BD-991204) • ETA: Friday 1:00 PM
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Footer Strip */}
+                  <div className="mt-4 pt-3 flex items-center justify-between text-xs text-[#464555] border-t border-[#eaedff]">
+                    <div className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-secondary text-[16px]">verified_user</span>
+                      <span>Encrypted Audio Recording</span>
+                    </div>
+                    <Link href="/login" className="font-semibold text-primary hover:underline">
+                      Try Calling Demo →
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
+          </section>
+        </div>
 
-          {/* Caller Identity & Informal Tone Settings */}
-          <div className="p-4 rounded-xl bg-[#faf9f6] border border-[#e2e1dd] space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        {/* Real-World Operations Strip */}
+        <section className="w-full bg-[#f2f3ff] border-y border-[#e2e7ff] py-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-primary text-[28px]">graphic_eq</span>
               <div>
-                <label className="text-sm font-bold text-[#1a1c1a] flex items-center gap-1.5" htmlFor="caller-name">
-                  <span className="material-symbols-outlined text-[#28543e] text-[18px]">person</span>
-                  <span>Speak As (Your Name)</span>
-                </label>
-                <p className="text-xs text-[#717973] mt-0.5">
-                  The assistant introduces directly as this name and never says it is an AI.
+                <h4 className="font-bold text-base text-[#131b2e]">Engineered for Indian Telephony Standards</h4>
+                <p className="text-xs sm:text-sm text-[#464555]">
+                  Trained on thousands of Indian ambient phone conversations and accents.
                 </p>
               </div>
-              <input
-                id="caller-name"
-                type="text"
-                required
-                value={callerName}
-                onChange={(e) => handleCallerNameChange(e.target.value)}
-                placeholder="Enter your name (e.g. Ganesh)"
-                className="w-full sm:w-48 min-h-[44px] px-3.5 bg-white border border-[#eeece8] rounded-xl text-sm font-semibold text-[#1a1c1a] focus:ring-2 focus:ring-[#28543e]/20 outline-none transition"
-              />
             </div>
-
-            {/* Conversational Tone */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-[#eeece8]">
-              <span className="text-xs font-semibold text-[#58605c]">Tone & Vocabulary</span>
-              <div className="grid grid-cols-2 gap-2 sm:w-72">
-                <button
-                  type="button"
-                  onClick={() => handleCallerToneChange('informal')}
-                  className={`min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                    callerTone === 'informal'
-                      ? 'bg-[#28543e] text-white shadow-xs'
-                      : 'bg-white border border-[#eeece8] text-[#58605c] hover:bg-[#f6f5f2]'
-                  }`}
-                >
-                  ⚡ Informal & Casual
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleCallerToneChange('formal')}
-                  className={`min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                    callerTone === 'formal'
-                      ? 'bg-[#28543e] text-white shadow-xs'
-                      : 'bg-white border border-[#eeece8] text-[#58605c] hover:bg-[#f6f5f2]'
-                  }`}
-                >
-                  Formal / Polite
-                </button>
-              </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="px-3.5 py-1.5 rounded-xl bg-white border border-[#e2e7ff] text-[#131b2e] text-xs sm:text-sm font-medium shadow-xs">
+                Telecom IVR Bypass
+              </span>
+              <span className="px-3.5 py-1.5 rounded-xl bg-white border border-[#e2e7ff] text-[#131b2e] text-xs sm:text-sm font-medium shadow-xs">
+                Background Noise Filtering
+              </span>
+              <span className="px-3.5 py-1.5 rounded-xl bg-white border border-[#e2e7ff] text-[#131b2e] text-xs sm:text-sm font-medium shadow-xs">
+                Indian Accent Prosody
+              </span>
             </div>
           </div>
+        </section>
 
-          {/* Phone Number Input */}
-          <div>
-            <label className="block text-sm font-semibold text-[#1a1c1a] mb-2" htmlFor="phone-input">
-              Target Phone Number
-            </label>
-            <div className="flex flex-col sm:flex-row gap-2.5">
-              <div className="relative w-full sm:w-36 flex-shrink-0">
-                <select
-                  id="country-code"
-                  value={countryCode}
-                  onChange={(e) => setCountryCode(e.target.value)}
-                  className="w-full min-h-[44px] pl-3.5 pr-8 bg-[#f6f5f2] border-0 rounded-xl text-sm font-medium text-[#1a1c1a] focus:bg-white focus:ring-2 focus:ring-[#28543e]/20 outline-none transition cursor-pointer appearance-none"
-                >
-                  <option value="+91">🇮🇳 +91 (IN)</option>
-                  <option value="+1">🇺🇸 +1 (US)</option>
-                  <option value="+44">🇬🇧 +44 (UK)</option>
-                  <option value="+971">🇦🇪 +971 (UAE)</option>
-                </select>
-                <span className="material-symbols-outlined absolute right-2.5 top-3 text-[#717973] pointer-events-none text-[18px]">
-                  expand_more
+        {/* "How It Works" Section */}
+        <section className="w-full py-20 lg:py-28 max-w-7xl mx-auto px-4 sm:px-6 lg:px-12" id="how-it-works">
+          <div className="flex flex-col items-center text-center max-w-2xl mx-auto mb-16">
+            <span className="text-xs uppercase tracking-wider text-primary font-bold mb-2">
+              Automated Workflow
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-[#131b2e] tracking-tight">How It Works</h2>
+            <p className="text-base text-[#464555] mt-2">
+              Three simple steps to autonomous telephonic workflows without dialing or waiting on hold.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Step 1 */}
+            <div className="group flex flex-col rounded-2xl bg-white border border-[#e2e7ff] p-8 shadow-sm hover:shadow-md transition-shadow">
+              <div className="w-14 h-14 rounded-2xl bg-[#e2dfff] text-primary flex items-center justify-center mb-6 shadow-xs group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[28px]">edit_note</span>
+              </div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-primary">Step 01</span>
+                <div className="h-px flex-1 bg-[#eaedff]"></div>
+              </div>
+              <h3 className="text-xl font-bold text-[#131b2e] mb-3">1. Set the Objective</h3>
+              <p className="text-sm text-[#464555] mb-6 leading-relaxed flex-1">
+                Type what you need done in plain language. Whether asking for order dispatch, confirming a doctor&apos;s
+                appointment, or checking store hours.
+              </p>
+              <div className="rounded-xl bg-[#f2f3ff] p-3.5">
+                <div className="text-[11px] uppercase tracking-wider text-[#464555] mb-1 font-bold">Prompt Example</div>
+                <p className="text-xs text-[#131b2e] italic font-medium">
+                  &ldquo;Ask when order #4892 will arrive and get the courier tracking ID.&rdquo;
+                </p>
+              </div>
+            </div>
+
+            {/* Step 2 */}
+            <div className="group flex flex-col rounded-2xl bg-white border border-[#e2e7ff] p-8 shadow-sm hover:shadow-md transition-shadow">
+              <div className="w-14 h-14 rounded-2xl bg-primary-container text-white flex items-center justify-center mb-6 shadow-xs group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[28px]">phone_in_talk</span>
+              </div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-primary">Step 02</span>
+                <div className="h-px flex-1 bg-[#eaedff]"></div>
+              </div>
+              <h3 className="text-xl font-bold text-[#131b2e] mb-3">2. AI Makes the Call</h3>
+              <p className="text-sm text-[#464555] mb-6 leading-relaxed flex-1">
+                Our voice agent dials the number and speaks with human cadence, seamlessly code-switching between Kannada,
+                English, or conversational Kanglish based on the respondent.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-2">
+                <span className="px-2.5 py-1 rounded-md bg-[#c9e6ff] text-[#004c6e] text-xs font-medium">
+                  Natural Prosody
+                </span>
+                <span className="px-2.5 py-1 rounded-md bg-[#e2dfff] text-primary text-xs font-medium">
+                  &lt;300ms Latency
+                </span>
+                <span className="px-2.5 py-1 rounded-md bg-[#e9ddff] text-[#5516be] text-xs font-medium">
+                  Dual Dialect
                 </span>
               </div>
-              <div className="relative flex-1">
-                <input
-                  id="phone-input"
-                  type="tel"
-                  required
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="Enter number (e.g. 98450 12345)"
-                  className="w-full min-h-[44px] px-3.5 bg-[#f6f5f2] border-0 rounded-xl text-sm font-medium text-[#1a1c1a] placeholder-[#717973] focus:bg-white focus:ring-2 focus:ring-[#28543e]/20 outline-none transition tracking-wide"
-                />
+            </div>
+
+            {/* Step 3 */}
+            <div className="group flex flex-col rounded-2xl bg-white border border-[#e2e7ff] p-8 shadow-sm hover:shadow-md transition-shadow">
+              <div className="w-14 h-14 rounded-2xl bg-secondary text-white flex items-center justify-center mb-6 shadow-xs group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[28px]">task_alt</span>
+              </div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-secondary">Step 03</span>
+                <div className="h-px flex-1 bg-[#eaedff]"></div>
+              </div>
+              <h3 className="text-xl font-bold text-[#131b2e] mb-3">3. Get the Results</h3>
+              <p className="text-sm text-[#464555] mb-6 leading-relaxed flex-1">
+                Receive an instant structured executive summary, verified dispatch dates, audio replay, and complete
+                bilingual transcript with zero guesswork.
+              </p>
+              <div className="rounded-xl bg-[#e2dfff]/50 p-3.5 flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-primary text-[20px]">notifications_active</span>
+                <span className="text-xs font-semibold text-primary">Instant Summary &amp; Audio Replay</span>
               </div>
             </div>
           </div>
+        </section>
 
-          {/* Task Instructions */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-semibold text-[#1a1c1a]" htmlFor="task-instructions">
-                What should I ask or confirm?
-              </label>
+        {/* Features Bento Section */}
+        <section className="w-full bg-[#f2f3ff] border-y border-[#e2e7ff] py-20 lg:py-28" id="features">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12">
+            <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
+              <div className="max-w-xl">
+                <span className="text-xs uppercase tracking-wider text-primary font-bold mb-2 block">
+                  Core Capabilities
+                </span>
+                <h2 className="text-3xl sm:text-4xl font-extrabold text-[#131b2e] tracking-tight">
+                  Engineered for Real-World Conversations
+                </h2>
+              </div>
+              <p className="text-sm sm:text-base text-[#464555] max-w-md">
+                Not just a basic speech synthesizer. VaaniCall AI combines custom neural acoustic models with real-time
+                reasoning to handle chaotic telephone environments.
+              </p>
             </div>
-            <textarea
-              id="task-instructions"
-              required
-              rows={3}
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              placeholder="Enter what to talk (e.g. Ask if my laptop is ready for pickup)..."
-              className="w-full p-3.5 bg-[#f6f5f2] border-0 rounded-xl text-sm leading-relaxed text-[#1a1c1a] placeholder-[#717973] focus:bg-white focus:ring-2 focus:ring-[#28543e]/20 outline-none transition resize-none"
-            />
-          </div>
 
-          {/* Language Selector */}
-          <div>
-            <label className="block text-sm font-semibold text-[#1a1c1a] mb-2">Language</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1 bg-[#f6f5f2] rounded-xl">
-              {[
-                { id: 'auto', label: 'Auto' },
-                { id: 'kannada', label: 'ಕನ್ನಡ' },
-                { id: 'english', label: 'English' },
-                { id: 'kanglish', label: 'Kanglish' },
-              ].map((lang) => (
-                <button
-                  key={lang.id}
-                  type="button"
-                  onClick={() => setLanguageMode(lang.id as any)}
-                  className={`w-full min-h-[40px] py-2 text-center rounded-lg text-xs sm:text-sm transition-all ${
-                    languageMode === lang.id
-                      ? 'bg-white text-[#28543e] font-bold shadow-xs'
-                      : 'text-[#58605c] hover:text-[#1a1c1a] font-medium'
-                  }`}
-                >
-                  {lang.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Voice Selection with Live Previews */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-semibold text-[#1a1c1a]">Voice Selection</label>
-              <span className="text-xs text-[#717973]">Click play to listen</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Voice 1 */}
-              <div
-                onClick={() => setVoiceProfile('aarohi')}
-                className={`min-h-[56px] flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition ${
-                  voiceProfile === 'aarohi'
-                    ? 'border-[#28543e] bg-[#eaf2ec]/40'
-                    : 'border-[#eeece8] bg-[#f6f5f2]/40 hover:bg-[#f6f5f2]'
-                }`}
-              >
-                <div className="flex flex-col">
-                  <span className="text-xs sm:text-sm font-semibold text-[#1a1c1a]">Aarohi</span>
-                  <span className="text-xs text-[#717973]">Warm & Expressive</span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Feature 1 */}
+              <div className="rounded-2xl bg-white border border-[#e2e7ff] p-8 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div className="w-12 h-12 rounded-xl bg-[#e2dfff] text-primary flex items-center justify-center mb-6">
+                    <span className="material-symbols-outlined text-[26px]">bolt</span>
+                  </div>
+                  <h3 className="text-lg font-bold text-[#131b2e] mb-3">Autonomous Execution</h3>
+                  <p className="text-sm text-[#464555] leading-relaxed">
+                    Handles real interactive phone trees, busy lines, hold music, and store managers. Adapts dynamically to
+                    unexpected questions and completes the objective without human intervention.
+                  </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    playSampleAudio('aarohi');
-                  }}
-                  className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[#28543e] shadow-xs hover:scale-105 transition"
-                  title="Preview Aarohi voice"
-                >
-                  <span className="material-symbols-outlined text-[18px]">
-                    {playingVoice === 'aarohi' ? 'stop' : 'play_arrow'}
-                  </span>
-                </button>
-              </div>
-
-              {/* Voice 2 */}
-              <div
-                onClick={() => setVoiceProfile('sunil')}
-                className={`min-h-[56px] flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition ${
-                  voiceProfile === 'sunil'
-                    ? 'border-[#28543e] bg-[#eaf2ec]/40'
-                    : 'border-[#eeece8] bg-[#f6f5f2]/40 hover:bg-[#f6f5f2]'
-                }`}
-              >
-                <div className="flex flex-col">
-                  <span className="text-xs sm:text-sm font-semibold text-[#1a1c1a]">{callerName}&apos;s Voice</span>
-                  <span className="text-xs text-[#717973]">Cloned Profile</span>
+                <div className="mt-8 pt-6 border-t border-[#eaedff] flex items-center justify-between text-[#464555] text-xs">
+                  <span>IVR Keypress Support</span>
+                  <span className="material-symbols-outlined text-primary text-[18px]">dialpad</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    playSampleAudio('sunil');
-                  }}
-                  className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[#28543e] shadow-xs hover:scale-105 transition"
-                  title="Preview Voice Clone"
-                >
-                  <span className="material-symbols-outlined text-[18px]">
-                    {playingVoice === 'sunil' ? 'stop' : 'play_arrow'}
-                  </span>
-                </button>
               </div>
 
-              {/* Voice 3: Add / Manage in Studio */}
-              <button
-                type="button"
-                onClick={() => router.push('/voice-studio/settings')}
-                className="min-h-[56px] flex items-center justify-center gap-1.5 p-3.5 rounded-xl border border-dashed border-[#c1c9c1] hover:border-[#28543e] hover:bg-[#f6f5f2] text-[#28543e] text-xs sm:text-sm font-medium transition text-center"
-              >
-                <span className="material-symbols-outlined text-[18px]">record_voice_over</span>
-                <span>Voice Studio</span>
-              </button>
+              {/* Feature 2 */}
+              <div className="rounded-2xl bg-white border border-[#e2e7ff] p-8 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div className="w-12 h-12 rounded-xl bg-[#c9e6ff] text-secondary flex items-center justify-center mb-6">
+                    <span className="material-symbols-outlined text-[26px]">translate</span>
+                  </div>
+                  <h3 className="text-lg font-bold text-[#131b2e] mb-3">Seamless Code-Mixing (Kanglish)</h3>
+                  <p className="text-sm text-[#464555] leading-relaxed">
+                    Native-level understanding of South Indian bilingual speech. Fluidly transitions between Kannada and
+                    Indian English mid-sentence just like a local resident.
+                  </p>
+                </div>
+                <div className="mt-8 pt-6 border-t border-[#eaedff] flex items-center justify-between text-[#464555] text-xs">
+                  <span>Dynamic Token Merging</span>
+                  <span className="material-symbols-outlined text-secondary text-[18px]">swap_horiz</span>
+                </div>
+              </div>
+
+              {/* Feature 3 */}
+              <div className="rounded-2xl bg-white border border-[#e2e7ff] p-8 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div className="w-12 h-12 rounded-xl bg-[#e9ddff] text-[#5516be] flex items-center justify-center mb-6">
+                    <span className="material-symbols-outlined text-[26px]">mic</span>
+                  </div>
+                  <h3 className="text-lg font-bold text-[#131b2e] mb-3">Custom Voice Cloning</h3>
+                  <p className="text-sm text-[#464555] leading-relaxed">
+                    Calibrate and authorize your own voice profile in 20 seconds. The AI speaks on your behalf with
+                    authorized consent and statutory AI disclosure built-in.
+                  </p>
+                </div>
+                <div className="mt-8 pt-6 border-t border-[#eaedff] flex items-center justify-between text-[#464555] text-xs">
+                  <span>Compliant AI Disclosures</span>
+                  <span className="material-symbols-outlined text-primary text-[18px]">security</span>
+                </div>
+              </div>
             </div>
           </div>
+        </section>
 
-          {/* Consent Checkbox */}
-          <div className="pt-2">
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <input
-                type="checkbox"
-                required
-                checked={consent}
-                onChange={(e) => setConsent(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded text-[#28543e] focus:ring-[#28543e] border-[#c1c9c1] accent-[#28543e] cursor-pointer"
-              />
-              <span className="text-xs sm:text-sm text-[#58605c] leading-relaxed select-none group-hover:text-[#1a1c1a] transition-colors">
-                Call on my behalf as <strong className="text-[#1a1c1a]">{callerName}</strong>, record and summarize the call for me.
+        {/* Interactive Live Demo Playground Section */}
+        <section className="w-full py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-12" id="playground">
+          <div className="rounded-3xl bg-[#e2e7ff]/60 border border-[#dae2fd] p-6 sm:p-10 lg:p-12 relative overflow-hidden">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+              {/* Left Column: Selectors */}
+              <div className="lg:col-span-6">
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-primary-container text-white mb-4 inline-block">
+                  Interactive Simulation
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-[#131b2e] mb-4">Try a Sample Voice Task</h2>
+                <p className="text-sm text-[#464555] mb-6">
+                  Select a common everyday call scenario to see how VaaniCall AI structures intent, dials, and extracts
+                  reliable intelligence.
+                </p>
+
+                <div className="flex flex-col gap-3">
+                  {[
+                    {
+                      id: 'logistics',
+                      icon: 'local_shipping',
+                      title: 'Courier Delivery Confirmation',
+                      desc: 'Kanglish • Tracking verification',
+                    },
+                    {
+                      id: 'doctor',
+                      icon: 'medical_services',
+                      title: 'Clinic Slot Rescheduling',
+                      desc: 'Kannada • Morning clinic queue',
+                    },
+                    {
+                      id: 'hardware',
+                      icon: 'hardware',
+                      title: 'Store Inventory Check',
+                      desc: 'English • Cement & paint availability',
+                    },
+                  ].map((sc) => (
+                    <button
+                      key={sc.id}
+                      type="button"
+                      onClick={() => setActiveScenario(sc.id)}
+                      className={`text-left p-4 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                        activeScenario === sc.id
+                          ? 'bg-white border-primary-container shadow-md shadow-primary-container/10'
+                          : 'bg-white/70 border-[#e2e7ff] hover:bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`material-symbols-outlined ${
+                            activeScenario === sc.id ? 'text-primary' : 'text-[#777587]'
+                          }`}
+                        >
+                          {sc.icon}
+                        </span>
+                        <div>
+                          <div className="font-semibold text-sm text-[#131b2e]">{sc.title}</div>
+                          <div className="text-xs text-[#464555]">{sc.desc}</div>
+                        </div>
+                      </div>
+                      <span
+                        className={`material-symbols-outlined text-lg ${
+                          activeScenario === sc.id ? 'text-primary' : 'text-[#777587]'
+                        }`}
+                      >
+                        {activeScenario === sc.id ? 'radio_button_checked' : 'radio_button_unchecked'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right Column: Display Screen */}
+              <div className="lg:col-span-6">
+                <div className="rounded-2xl bg-white border border-[#e2e7ff] p-6 shadow-md">
+                  <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#eaedff]">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-primary-container"></span>
+                      <span className="font-bold text-sm sm:text-base text-[#131b2e]">{scenarioData.title}</span>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#e2dfff] text-primary">
+                      {scenarioData.lang}
+                    </span>
+                  </div>
+
+                  {/* Dialogue Script */}
+                  <div className="space-y-3 min-h-[220px]">
+                    <div className="p-3.5 rounded-lg bg-[#f2f3ff] text-sm text-[#131b2e]">
+                      <span className="font-bold text-primary block text-xs mb-1">
+                        {scenarioData.dialogue[0].speaker}:
+                      </span>
+                      &ldquo;{scenarioData.dialogue[0].text}&rdquo;
+                    </div>
+
+                    <div className="p-3.5 rounded-lg bg-[#eaedff]/60 text-sm text-[#131b2e]">
+                      <span className="font-bold text-[#464555] block text-xs mb-1">
+                        {scenarioData.dialogue[1].speaker}:
+                      </span>
+                      &ldquo;{scenarioData.dialogue[1].text}&rdquo;
+                    </div>
+
+                    <div className="p-3.5 rounded-lg bg-[#e2dfff]/40 text-sm text-[#131b2e]">
+                      <span className="font-bold text-primary block text-xs mb-1">
+                        {scenarioData.dialogue[2].speaker}:
+                      </span>
+                      {scenarioData.dialogue[2].text}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-[#eaedff] flex items-center justify-between text-xs text-[#464555]">
+                    <span>Extracted in 28 seconds</span>
+                    <Link href="/login" className="font-semibold text-primary hover:underline">
+                      Try Real Voice Call →
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* CTA Banner */}
+        <section className="w-full pb-20 lg:pb-28 max-w-7xl mx-auto px-4 sm:px-6 lg:px-12">
+          <div className="relative rounded-3xl bg-primary-container text-white p-8 sm:p-12 lg:p-16 overflow-hidden shadow-2xl">
+            <div className="absolute -right-20 -bottom-20 w-96 h-96 rounded-full bg-primary blur-3xl opacity-60 pointer-events-none"></div>
+            <div className="absolute -left-20 -top-20 w-80 h-80 rounded-full bg-secondary blur-3xl opacity-40 pointer-events-none"></div>
+            <div className="relative z-10 max-w-3xl">
+              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white backdrop-blur-md mb-6">
+                <span className="material-symbols-outlined text-[16px]">call</span>
+                <span>Zero Human Phone Tag</span>
               </span>
-            </label>
+              <h2 className="text-3xl sm:text-4xl font-extrabold mb-4 tracking-tight">Ready to automate your calls?</h2>
+              <p className="text-base sm:text-lg text-indigo-100 mb-8 max-w-xl leading-relaxed">
+                Join innovators delegating everyday phone tasks to VaaniCall AI. Experience fluent Kanglish phone agent
+                workflows today.
+              </p>
+              <div className="flex flex-wrap items-center gap-4">
+                <Link
+                  href="/login"
+                  className="px-7 py-3.5 rounded-xl font-bold text-sm sm:text-base bg-white text-[#131b2e] hover:bg-slate-100 transition-all shadow-lg active:scale-[0.99]"
+                >
+                  Start Free Trial
+                </Link>
+                <Link
+                  href="/login"
+                  className="px-7 py-3.5 rounded-xl font-semibold text-sm sm:text-base bg-white/15 text-white hover:bg-white/25 transition-colors backdrop-blur-md"
+                >
+                  Login with Demo
+                </Link>
+              </div>
+            </div>
           </div>
+        </section>
+      </main>
 
-          {/* Main Action Button */}
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full min-h-[48px] py-3.5 px-6 rounded-xl bg-[#28543e] hover:bg-[#1d3f2f] text-white text-sm sm:text-base font-semibold shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <>
-                  <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Connecting Phone Call...</span>
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-[20px]">call</span>
-                  <span>Make Call as {callerName} (ಕರೆ ಮಾಡಿ)</span>
-                </>
-              )}
-            </button>
+      {/* Footer */}
+      <footer className="w-full bg-[#f2f3ff] border-t border-[#eaedff] py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex flex-col items-center md:items-start gap-1">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-base text-[#131b2e]">VaaniCall AI</span>
+              <span className="text-[#464555]">•</span>
+              <span className="text-xs text-[#464555]">Your AI. Your Voice. Your Calls.</span>
+            </div>
+            <p className="text-xs text-[#464555]">© 2025 VaaniCall AI Systems Inc. All rights reserved.</p>
           </div>
-        </form>
-      </div>
+          <div className="flex items-center gap-6 text-xs text-[#464555]">
+            <Link href="/login" className="hover:text-[#131b2e] transition-colors">
+              Platform
+            </Link>
+            <Link href="/login" className="hover:text-[#131b2e] transition-colors">
+              Documentation
+            </Link>
+            <Link href="/login" className="hover:text-[#131b2e] transition-colors">
+              API
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

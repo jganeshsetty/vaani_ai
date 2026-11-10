@@ -50,6 +50,26 @@ def test_list_tasks(client: TestClient) -> None:
     assert resp.json() == []
 
 
+def test_auth_login_and_me(client: TestClient) -> None:
+    # 1. Login with demo credentials
+    resp = client.post("/api/auth/login", json={"email": "demo@vaanicall.ai", "password": "demo123"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "access_token" in data
+    assert data["user"]["email"] == "demo@vaanicall.ai"
+    token = data["access_token"]
+
+    # 2. Access /me with token
+    me_resp = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me_resp.status_code == 200
+    assert me_resp.json()["email"] == "demo@vaanicall.ai"
+
+    # 3. Demo shortcut
+    demo_resp = client.post("/api/auth/demo")
+    assert demo_resp.status_code == 200
+    assert "access_token" in demo_resp.json()
+
+
 def _stub_task(payload: dict) -> dict:
     from datetime import datetime, timezone
 

@@ -288,7 +288,7 @@ export default function VoiceStudioSettingsPage() {
         <button
           type="button"
           onClick={handleSave}
-          className="min-h-[44px] inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#28543e] hover:bg-[#1d3f2f] active:scale-[0.98] text-white text-xs sm:text-sm font-semibold transition-all shadow-xs self-start sm:self-center cursor-pointer"
+          className="min-h-[44px] inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#4f46e5] hover:bg-[#3730a3] active:scale-[0.98] text-white text-xs sm:text-sm font-semibold transition-all shadow-xs self-start sm:self-center cursor-pointer"
         >
           <span className="material-symbols-outlined text-base">
             {saved ? 'check' : 'save'}
@@ -310,7 +310,7 @@ export default function VoiceStudioSettingsPage() {
             onClick={() => setActiveTab(tab.id as any)}
             className={`min-h-[44px] flex items-center gap-2 pb-3 px-1 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap cursor-pointer ${
               activeTab === tab.id
-                ? 'border-[#28543e] text-[#28543e]'
+                ? 'border-[#4f46e5] text-[#4f46e5]'
                 : 'border-transparent text-[#717973] hover:text-[#1a1c1a]'
             }`}
           >
@@ -324,11 +324,11 @@ export default function VoiceStudioSettingsPage() {
       {activeTab === 'profiles' && (
         <div className="space-y-6">
           {/* Real Voice Clone Recorder Card */}
-          <div className="bg-white rounded-2xl border border-[#d2ded5] p-5 sm:p-7 shadow-xs space-y-5">
+          <div className="bg-white rounded-2xl border border-[#e2e8f0] p-5 sm:p-7 shadow-xs space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-[#eaf2ec] text-[#28543e] text-xs font-semibold mb-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#28543e] animate-pulse" />
+                <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-[#eef2ff] text-[#4f46e5] text-xs font-semibold mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#4f46e5] animate-pulse" />
                   <span>Real Microphone Recording &amp; Voice Clone</span>
                 </div>
                 <h2 className="text-lg sm:text-xl font-bold text-[#1a1c1a]">Clone Your Voice</h2>
@@ -337,8 +337,8 @@ export default function VoiceStudioSettingsPage() {
                 </p>
               </div>
               {cloneCreated && (
-                <div className="px-3.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-300 text-xs font-semibold text-emerald-800 flex items-center gap-1.5 animate-bounce">
-                  <span className="material-symbols-outlined text-base text-emerald-600">check_circle</span>
+                <div className="px-3.5 py-1.5 rounded-xl bg-cyan-50 border border-cyan-300 text-xs font-semibold text-cyan-800 flex items-center gap-1.5 animate-bounce">
+                  <span className="material-symbols-outlined text-base text-cyan-600">check_circle</span>
                   <span>Voice Clone Created &amp; Saved!</span>
                 </div>
               )}
@@ -356,7 +356,7 @@ export default function VoiceStudioSettingsPage() {
                 <button
                   type="button"
                   onClick={startRecording}
-                  className="w-full sm:w-auto min-h-[48px] px-6 py-3 rounded-xl bg-[#28543e] hover:bg-[#1d3f2f] text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 shadow-xs transition"
+                  className="w-full sm:w-auto min-h-[48px] px-6 py-3 rounded-xl bg-[#4f46e5] hover:bg-[#3730a3] text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 shadow-xs transition"
                 >
                   <span className="material-symbols-outlined text-xl text-red-300">mic</span>
                   <span>Start Recording Microphone</span>
@@ -392,9 +392,9 @@ export default function VoiceStudioSettingsPage() {
 
             {/* Audio Playback of Recorded Sample */}
             {recordedAudioUrl && (
-              <div className="p-4 rounded-xl bg-[#eaf2ec]/40 border border-[#28543e]/30 space-y-3">
+              <div className="p-4 rounded-xl bg-[#eef2ff]/40 border border-[#4f46e5]/30 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-[#28543e] flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-[#4f46e5] flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-base">audio_file</span>
                     <span>Recorded Voice Sample Ready</span>
                   </span>
@@ -409,12 +409,12 @@ export default function VoiceStudioSettingsPage() {
                     value={customVoiceName}
                     onChange={(e) => setCustomVoiceName(e.target.value)}
                     placeholder={`${callerName}'s Personal Clone Name`}
-                    className="flex-1 min-h-[44px] px-3.5 bg-white border border-[#c1c9c1] rounded-xl text-xs sm:text-sm font-medium outline-none focus:ring-2 focus:ring-[#28543e]/20"
+                    className="flex-1 min-h-[44px] px-3.5 bg-white border border-[#c1c9c1] rounded-xl text-xs sm:text-sm font-medium outline-none focus:ring-2 focus:ring-[#4f46e5]/20"
                   />
                   <button
                     type="button"
                     onClick={handleSaveClone}
-                    className="min-h-[44px] px-6 py-2.5 rounded-xl bg-[#28543e] hover:bg-[#1d3f2f] text-white text-xs sm:text-sm font-semibold shadow-xs transition"
+                    className="min-h-[44px] px-6 py-2.5 rounded-xl bg-[#4f46e5] hover:bg-[#3730a3] text-white text-xs sm:text-sm font-semibold shadow-xs transition"
                   >
                     Save &amp; Activate Voice Clone
                   </button>
@@ -433,15 +433,15 @@ export default function VoiceStudioSettingsPage() {
                   onClick={() => setSelectedVoice(profile.id)}
                   className={`p-4 sm:p-5 rounded-2xl border transition cursor-pointer flex flex-col justify-between gap-3 ${
                     selectedVoice === profile.id
-                      ? 'border-[#28543e] bg-[#eaf2ec]/30 shadow-xs'
-                      : 'border-[#eeece8] bg-white hover:border-[#28543e]/40'
+                      ? 'border-[#4f46e5] bg-[#eef2ff]/30 shadow-xs'
+                      : 'border-[#eeece8] bg-white hover:border-[#4f46e5]/40'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-bold text-sm sm:text-base text-[#1a1c1a]">{profile.name}</h3>
-                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#f6f5f2] text-[#28543e]">
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#f6f5f2] text-[#4f46e5]">
                           {profile.tag}
                         </span>
                       </div>
@@ -455,7 +455,7 @@ export default function VoiceStudioSettingsPage() {
                         e.stopPropagation();
                         handlePlayVoicePreview(profile);
                       }}
-                      className="w-10 h-10 rounded-full bg-white border border-[#eeece8] hover:border-[#28543e] text-[#28543e] flex items-center justify-center shadow-xs shrink-0 hover:scale-105 transition"
+                      className="w-10 h-10 rounded-full bg-white border border-[#eeece8] hover:border-[#4f46e5] text-[#4f46e5] flex items-center justify-center shadow-xs shrink-0 hover:scale-105 transition"
                       title="Preview this voice"
                     >
                       <span className="material-symbols-outlined text-xl">
@@ -466,7 +466,7 @@ export default function VoiceStudioSettingsPage() {
 
                   <div className="flex items-center justify-between text-xs text-[#717973] pt-2 border-t border-[#eeece8]/60">
                     <span>{profile.languages}</span>
-                    <span className="font-semibold text-[#28543e]">
+                    <span className="font-semibold text-[#4f46e5]">
                       {selectedVoice === profile.id ? '✓ Selected Voice' : 'Click to Select'}
                     </span>
                   </div>
@@ -498,7 +498,7 @@ export default function VoiceStudioSettingsPage() {
                 value={callerName}
                 onChange={(e) => setCallerName(e.target.value)}
                 placeholder="e.g. Ganesh, Sunil Kumar..."
-                className="w-full min-h-[44px] px-3.5 bg-[#f6f5f2] border-0 rounded-xl text-sm font-semibold text-[#1a1c1a] focus:bg-white focus:ring-2 focus:ring-[#28543e]/20 outline-none transition"
+                className="w-full min-h-[44px] px-3.5 bg-[#f6f5f2] border-0 rounded-xl text-sm font-semibold text-[#1a1c1a] focus:bg-white focus:ring-2 focus:ring-[#4f46e5]/20 outline-none transition"
               />
             </div>
 
@@ -512,7 +512,7 @@ export default function VoiceStudioSettingsPage() {
                   onClick={() => setConversationalTone('informal')}
                   className={`min-h-[48px] p-3 rounded-xl border text-left text-xs sm:text-sm font-medium transition cursor-pointer ${
                     conversationalTone === 'informal'
-                      ? 'border-[#28543e] bg-[#eaf2ec]/40 text-[#28543e] font-semibold'
+                      ? 'border-[#4f46e5] bg-[#eef2ff]/40 text-[#4f46e5] font-semibold'
                       : 'border-[#eeece8] bg-[#f6f5f2] text-[#58605c]'
                   }`}
                 >
@@ -527,7 +527,7 @@ export default function VoiceStudioSettingsPage() {
                   onClick={() => setConversationalTone('formal')}
                   className={`min-h-[48px] p-3 rounded-xl border text-left text-xs sm:text-sm font-medium transition cursor-pointer ${
                     conversationalTone === 'formal'
-                      ? 'border-[#28543e] bg-[#eaf2ec]/40 text-[#28543e] font-semibold'
+                      ? 'border-[#4f46e5] bg-[#eef2ff]/40 text-[#4f46e5] font-semibold'
                       : 'border-[#eeece8] bg-[#f6f5f2] text-[#58605c]'
                   }`}
                 >
@@ -545,7 +545,7 @@ export default function VoiceStudioSettingsPage() {
                   type="checkbox"
                   checked={hideAiIdentity}
                   onChange={(e) => setHideAiIdentity(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded text-[#28543e] focus:ring-[#28543e] border-[#c1c9c1] accent-[#28543e]"
+                  className="mt-0.5 w-4 h-4 rounded text-[#4f46e5] focus:ring-[#4f46e5] border-[#c1c9c1] accent-[#4f46e5]"
                 />
                 <span className="text-xs sm:text-sm text-[#58605c] leading-relaxed select-none">
                   <strong className="text-[#1a1c1a] block">Never introduce as an AI or VaaniCall</strong>
@@ -571,7 +571,7 @@ export default function VoiceStudioSettingsPage() {
             <div>
               <div className="flex justify-between text-xs sm:text-sm font-semibold mb-2">
                 <span>Speaking Rate</span>
-                <span className="text-[#28543e] font-mono">{speakingSpeed.toFixed(1)}x</span>
+                <span className="text-[#4f46e5] font-mono">{speakingSpeed.toFixed(1)}x</span>
               </div>
               <input
                 type="range"
@@ -580,7 +580,7 @@ export default function VoiceStudioSettingsPage() {
                 step="0.05"
                 value={speakingSpeed}
                 onChange={(e) => setSpeakingSpeed(parseFloat(e.target.value))}
-                className="w-full accent-[#28543e] cursor-pointer"
+                className="w-full accent-[#4f46e5] cursor-pointer"
               />
               <div className="flex justify-between text-[11px] text-[#717973] mt-1">
                 <span>0.8x (Deliberate)</span>

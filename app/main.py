@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import health_router, media_router, tasks_router
+from app.api.routers import auth_router, health_router, media_router, tasks_router
 from app.config import settings
 from app.database import close_mongo_connection, connect_to_mongo
 
@@ -52,5 +52,6 @@ app.add_middleware(
 
 # Routers.
 app.include_router(health_router)
+app.include_router(auth_router)
 app.include_router(tasks_router)
 app.include_router(media_router)

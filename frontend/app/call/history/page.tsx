@@ -81,12 +81,12 @@ export default function CallHistoryPage() {
       {/* Title & Subtitle */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#1a1c1a] tracking-tight">Call History</h1>
-          <p className="text-sm text-[#58605c] mt-1">Review past conversations, summaries, and recordings</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#131b2e] tracking-tight">Call History</h1>
+          <p className="text-sm text-[#464555] mt-1">Review past conversations, summaries, and recordings</p>
         </div>
         <Link
-          href="/"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#28543e] hover:bg-[#1d3f2f] text-white text-xs sm:text-sm font-semibold transition shadow-xs self-start sm:self-center"
+          href="/dashboard"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-container hover:bg-primary text-white text-xs sm:text-sm font-semibold transition shadow-xs self-start sm:self-center cursor-pointer"
         >
           <span className="material-symbols-outlined text-[18px]">add_call</span>
           <span>New Call</span>
@@ -94,10 +94,10 @@ export default function CallHistoryPage() {
       </div>
 
       {/* Filter & Search Toolbar */}
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#eeece8] shadow-xs space-y-4">
+      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#e2e7ff] shadow-xl shadow-slate-900/5 space-y-4">
         {/* Search Bar */}
         <div className="relative">
-          <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#717973] text-[20px]">
+          <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#777587] text-[20px]">
             search
           </span>
           <input
@@ -105,12 +105,12 @@ export default function CallHistoryPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search calls, contacts, or summary keywords..."
-            className="w-full pl-11 pr-4 py-2.5 bg-[#f6f5f2] rounded-xl text-sm text-[#1a1c1a] placeholder:text-[#717973] border border-transparent focus:border-[#d2ded5] focus:bg-white focus:outline-none transition-all"
+            className="w-full pl-11 pr-4 py-2.5 bg-[#f2f3ff] rounded-xl text-sm text-[#131b2e] placeholder:text-[#777587] border border-transparent focus:border-primary-container focus:bg-white focus:outline-none transition-all"
           />
         </div>
 
         {/* Human Filter Tabs */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[#eeece8]/60">
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[#eaedff]">
           {[
             { id: 'all', label: 'All Calls' },
             { id: 'completed', label: 'Completed' },
@@ -121,10 +121,10 @@ export default function CallHistoryPage() {
               key={tab.id}
               type="button"
               onClick={() => setFilter(tab.id as any)}
-              className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-colors ${
+              className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
                 filter === tab.id
-                  ? 'bg-[#28543e] text-white font-semibold shadow-xs'
-                  : 'bg-[#f6f5f2] hover:bg-[#eaf2ec] text-[#58605c] hover:text-[#28543e]'
+                  ? 'bg-primary-container text-white shadow-xs'
+                  : 'bg-[#f2f3ff] hover:bg-[#eaedff] text-[#464555] hover:text-[#131b2e]'
               }`}
             >
               {tab.label}
@@ -136,8 +136,8 @@ export default function CallHistoryPage() {
       {/* Call History Card List */}
       <div className="space-y-4">
         {filteredItems.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-[#eeece8] p-12 text-center text-[#717973]">
-            <span className="material-symbols-outlined text-4xl text-[#717973]/60 mb-2">inbox</span>
+          <div className="bg-white rounded-2xl border border-[#e2e7ff] p-12 text-center text-[#777587]">
+            <span className="material-symbols-outlined text-4xl text-[#777587]/60 mb-2">inbox</span>
             <p className="text-sm">No calls found matching your filter criteria.</p>
           </div>
         ) : (
@@ -145,26 +145,26 @@ export default function CallHistoryPage() {
             <div
               key={item.id}
               onClick={() => router.push(`/call/${item.id}`)}
-              className="bg-white rounded-2xl p-5 border border-[#eeece8] hover:border-[#28543e]/40 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group"
+              className="bg-white rounded-2xl p-5 border border-[#e2e7ff] hover:border-primary-container shadow-xl shadow-slate-900/5 hover:shadow-2xl transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group"
             >
               <div className="flex items-start gap-3.5 min-w-0">
-                <div className="w-11 h-11 rounded-xl bg-[#eaf2ec] text-[#28543e] flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-[#28543e] group-hover:text-white transition-colors">
+                <div className="w-11 h-11 rounded-xl bg-[#e2dfff] text-primary flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-primary-container group-hover:text-white transition-colors">
                   <span className="material-symbols-outlined text-xl">phone_in_talk</span>
                 </div>
                 <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-base text-[#1a1c1a] group-hover:text-[#28543e] transition-colors truncate">
+                    <h3 className="font-bold text-base text-[#131b2e] group-hover:text-primary transition-colors truncate">
                       {item.name}
                     </h3>
-                    <span className="text-xs font-mono text-[#717973]">{item.number}</span>
+                    <span className="text-xs font-mono text-[#777587]">{item.number}</span>
                   </div>
-                  <p className="text-xs sm:text-sm text-[#58605c] line-clamp-1">{item.summary}</p>
-                  <div className="flex items-center gap-3 text-xs text-[#717973] pt-0.5">
+                  <p className="text-xs sm:text-sm text-[#464555] line-clamp-1">{item.summary}</p>
+                  <div className="flex items-center gap-3 text-xs text-[#777587] pt-0.5">
                     <span>{item.date}</span>
                     <span>•</span>
                     <span>{item.duration}</span>
                     <span>•</span>
-                    <span className="font-semibold text-[#28543e]">{item.language}</span>
+                    <span className="font-semibold text-primary">{item.language}</span>
                   </div>
                 </div>
               </div>
@@ -174,7 +174,7 @@ export default function CallHistoryPage() {
                 <span
                   className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
                     item.status === 'completed'
-                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      ? 'bg-[#e2dfff] text-primary border border-[#c3c0ff]'
                       : item.status === 'missed'
                       ? 'bg-amber-50 text-amber-800 border border-amber-200'
                       : 'bg-blue-50 text-blue-800 border border-blue-200'
@@ -183,7 +183,7 @@ export default function CallHistoryPage() {
                   <span
                     className={`w-1.5 h-1.5 rounded-full ${
                       item.status === 'completed'
-                        ? 'bg-emerald-600'
+                        ? 'bg-primary-container'
                         : item.status === 'missed'
                         ? 'bg-amber-600'
                         : 'bg-blue-600'
@@ -194,7 +194,7 @@ export default function CallHistoryPage() {
 
                 <button
                   type="button"
-                  className="px-3.5 py-1.5 rounded-xl border border-[#eeece8] text-xs font-semibold text-[#58605c] hover:bg-[#eaf2ec] hover:text-[#28543e] transition flex items-center gap-1"
+                  className="px-3.5 py-1.5 rounded-xl border border-[#e2e7ff] text-xs font-semibold text-[#464555] hover:bg-[#f2f3ff] hover:text-[#131b2e] transition flex items-center gap-1"
                 >
                   <span>Details</span>
                   <span className="material-symbols-outlined text-[16px]">chevron_right</span>

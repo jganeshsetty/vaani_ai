@@ -145,15 +145,15 @@ ${transcriptTurns.map((t) => `${t.speaker}: "${t.kannada}" (${t.english})`).join
       <div className="flex items-center justify-between">
         <Link
           href="/call/history"
-          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#58605c] hover:text-[#28543e] transition"
+          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#464555] hover:text-primary transition"
         >
           <span className="material-symbols-outlined text-base">arrow_back</span>
           <span>Back to Call History</span>
         </Link>
 
         <Link
-          href="/"
-          className="min-h-[40px] inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#28543e] hover:bg-[#1d3f2f] text-white text-xs sm:text-sm font-semibold shadow-xs transition"
+          href="/dashboard"
+          className="min-h-[40px] inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary-container hover:bg-primary text-white text-xs sm:text-sm font-semibold shadow-xs transition cursor-pointer"
         >
           <span className="material-symbols-outlined text-[18px]">add_call</span>
           <span>Make Another Call</span>
@@ -161,29 +161,29 @@ ${transcriptTurns.map((t) => `${t.speaker}: "${t.kannada}" (${t.english})`).join
       </div>
 
       {/* Header Card */}
-      <div className="bg-white rounded-2xl border border-[#eeece8] p-5 sm:p-7 shadow-xs space-y-4">
+      <div className="bg-white rounded-2xl border border-[#e2e7ff] p-5 sm:p-7 shadow-xl shadow-slate-900/5 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-[#eaf2ec] flex items-center justify-center text-[#28543e] shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-[#e2dfff] flex items-center justify-center text-primary shrink-0">
               <span className="material-symbols-outlined text-2xl">
                 {recipientName === 'Ganesh' ? 'person' : 'phone_in_talk'}
               </span>
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-bold text-[#1a1c1a] tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-bold text-[#131b2e] tracking-tight">
                   Call with {recipientName}
                 </h1>
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#eaf2ec] text-[#28543e]">
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#e2dfff] text-primary">
                   {callTag}
                 </span>
               </div>
-              <div className="text-xs sm:text-sm text-[#58605c] font-medium mt-1 flex items-center gap-2 flex-wrap">
-                <span className="font-mono text-[#717973]">{targetPhone}</span>
+              <div className="text-xs sm:text-sm text-[#464555] font-medium mt-1 flex items-center gap-2 flex-wrap">
+                <span className="font-mono text-[#777587]">{targetPhone}</span>
                 <span>•</span>
-                <span>Spoke as <strong className="text-[#1a1c1a]">{callerName}</strong></span>
+                <span>Spoke as <strong className="text-[#131b2e]">{callerName}</strong></span>
                 <span>•</span>
-                <span className="text-emerald-700 font-semibold">Completed</span>
+                <span className="text-primary font-semibold">Completed</span>
               </div>
             </div>
           </div>
@@ -194,10 +194,10 @@ ${transcriptTurns.map((t) => `${t.speaker}: "${t.kannada}" (${t.english})`).join
             <button
               type="button"
               onClick={handleAudioPlayback}
-              className={`min-h-[44px] px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition ${
+              className={`min-h-[44px] px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition cursor-pointer ${
                 isPlaying
                   ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                  : 'bg-[#eaf2ec] text-[#28543e] hover:bg-[#d8e8dc]'
+                  : 'bg-[#e2dfff] text-primary hover:bg-[#c3c0ff]'
               }`}
             >
               <span className="material-symbols-outlined text-base">
@@ -210,7 +210,7 @@ ${transcriptTurns.map((t) => `${t.speaker}: "${t.kannada}" (${t.english})`).join
             <button
               type="button"
               onClick={handleCopy}
-              className="min-h-[44px] px-4 py-2 rounded-xl border border-[#eeece8] hover:bg-[#f6f5f2] text-xs sm:text-sm font-semibold text-[#58605c] hover:text-[#1a1c1a] flex items-center gap-1.5 transition"
+              className="min-h-[44px] px-4 py-2 rounded-xl border border-[#e2e7ff] hover:bg-[#f2f3ff] text-xs sm:text-sm font-semibold text-[#464555] hover:text-[#131b2e] flex items-center gap-1.5 transition cursor-pointer"
             >
               <span className="material-symbols-outlined text-base">
                 {copied ? 'check' : 'content_copy'}
@@ -221,33 +221,33 @@ ${transcriptTurns.map((t) => `${t.speaker}: "${t.kannada}" (${t.english})`).join
         </div>
 
         {/* Dynamic Executive Call Summary */}
-        <div className="p-4 rounded-xl bg-[#faf9f6] border border-[#e2e1dd] space-y-2">
+        <div className="p-4 rounded-xl bg-[#f2f3ff] border border-[#eaedff] space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#28543e] flex items-center gap-1.5">
+            <span className="text-xs font-bold text-primary flex items-center gap-1.5">
               <span className="material-symbols-outlined text-base">verified</span>
               <span>Call Outcome &amp; Summary</span>
             </span>
-            <span className="text-[11px] text-[#717973]">Directly verified on call</span>
+            <span className="text-[11px] text-[#777587]">Directly verified on call</span>
           </div>
-          <p className="text-xs sm:text-sm text-[#1a1c1a] font-medium leading-relaxed">
+          <p className="text-xs sm:text-sm text-[#131b2e] font-medium leading-relaxed">
             {summaryText}
           </p>
         </div>
       </div>
 
-      {/* Transcript with Interactive UP Translation Button */}
-      <div className="bg-white rounded-2xl border border-[#eeece8] p-5 sm:p-7 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#eeece8] gap-3">
+      {/* Transcript with Interactive Translation Button */}
+      <div className="bg-white rounded-2xl border border-[#e2e7ff] p-5 sm:p-7 shadow-xl shadow-slate-900/5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#eaedff] gap-3">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#28543e] text-xl">record_voice_over</span>
-            <h2 className="text-base sm:text-lg font-bold text-[#1a1c1a]">Full Conversation Transcript</h2>
+            <span className="material-symbols-outlined text-primary text-xl">record_voice_over</span>
+            <h2 className="text-base sm:text-lg font-bold text-[#131b2e]">Full Conversation Transcript</h2>
           </div>
 
-          {/* Interactive UP Translation Toggle */}
+          {/* Interactive Translation Toggle */}
           <button
             type="button"
             onClick={cycleTranslation}
-            className="min-h-[38px] inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#f6f5f2] hover:bg-[#eaf2ec] border border-[#d2ded5] text-xs font-semibold text-[#28543e] shadow-2xs transition active:scale-95 cursor-pointer self-start sm:self-auto"
+            className="min-h-[38px] inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#f2f3ff] hover:bg-[#eaedff] border border-[#dae2fd] text-xs font-semibold text-primary shadow-xs transition active:scale-95 cursor-pointer self-start sm:self-auto"
             title="Cycle Subtitle Translation Mode"
           >
             <span className="material-symbols-outlined text-[15px]">translate</span>
@@ -264,8 +264,8 @@ ${transcriptTurns.map((t) => `${t.speaker}: "${t.kannada}" (${t.english})`).join
         {/* Dynamic Turns */}
         <div className="space-y-4 pt-2">
           {transcriptTurns.length === 0 ? (
-            <div className="p-8 text-center text-[#717973] bg-[#faf9f6] rounded-2xl border border-[#eeece8]">
-              <span className="material-symbols-outlined text-3xl mb-1 text-[#28543e]">mic_none</span>
+            <div className="p-8 text-center text-[#777587] bg-[#f2f3ff] rounded-2xl border border-[#eaedff]">
+              <span className="material-symbols-outlined text-3xl mb-1 text-primary">mic_none</span>
               <p className="text-sm font-medium">No speech transcript recorded for this call yet.</p>
             </div>
           ) : (
@@ -279,23 +279,23 @@ ${transcriptTurns.map((t) => `${t.speaker}: "${t.kannada}" (${t.english})`).join
                   }`}
                 >
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-1 shadow-2xs ${
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-1 shadow-xs ${
                       isCaller
-                        ? 'bg-[#28543e] text-white'
-                        : 'bg-white border border-[#eeece8] text-[#58605c]'
+                        ? 'bg-primary-container text-white'
+                        : 'bg-white border border-[#e2e7ff] text-[#464555]'
                     }`}
                   >
                     {isCaller ? callerName[0]?.toUpperCase() || 'G' : recipientName[0]?.toUpperCase() || 'R'}
                   </div>
 
                   <div
-                    className={`p-4 rounded-2xl text-xs sm:text-sm space-y-1.5 shadow-2xs ${
+                    className={`p-4 rounded-2xl text-xs sm:text-sm space-y-1.5 shadow-xs ${
                       isCaller
-                        ? 'bg-[#28543e] text-white rounded-tr-xs'
-                        : 'bg-[#faf9f6] text-[#1a1c1a] border border-[#eeece8] rounded-tl-xs'
+                        ? 'bg-primary-container text-white rounded-tr-none'
+                        : 'bg-[#f2f3ff] text-[#131b2e] border border-[#eaedff] rounded-tl-none'
                     }`}
                   >
-                    <div className="text-[11px] font-semibold opacity-80">{turn.speaker}</div>
+                    <div className="text-[11px] font-semibold opacity-85">{turn.speaker}</div>
 
                     {(translationMode === 'both' || translationMode === 'kannada') && (
                       <p className="font-medium leading-relaxed">{turn.kannada}</p>
@@ -306,7 +306,7 @@ ${transcriptTurns.map((t) => `${t.speaker}: "${t.kannada}" (${t.english})`).join
                         className={`text-[12px] leading-relaxed pt-0.5 border-t ${
                           isCaller
                             ? 'text-white/80 border-white/20'
-                            : 'text-[#58605c] border-[#eeece8]'
+                            : 'text-[#464555] border-[#eaedff]'
                         }`}
                       >
                         {turn.english}

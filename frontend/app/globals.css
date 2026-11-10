@@ -6,13 +6,23 @@
   html, body {
     margin: 0;
     padding: 0;
-    background-color: #faf9f6;
-    color: #1a1c1a;
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    background-color: #faf8ff;
+    color: #131b2e;
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   }
   body {
     overscroll-behavior: none;
   }
+}
+
+.badge-kannada {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200;
+}
+.badge-english {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200;
+}
+.badge-kanglish {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 border border-purple-200;
 }
 
 ::-webkit-scrollbar {
