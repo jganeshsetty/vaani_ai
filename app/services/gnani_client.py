@@ -97,6 +97,10 @@ class GnaniSTTClient:
                 pass
 
 
+# In-memory cache for repeated synthesized audio phrases to minimize Gnani TTS token usage.
+_TTS_AUDIO_CACHE: dict[tuple[str, str, str], list[bytes]] = {}
+
+
 class GnaniTTSClient:
     """Streaming Text-to-Speech via Gnani Timbre."""
 
@@ -139,15 +143,29 @@ class GnaniTTSClient:
         logger.info("Gnani TTS connected (%s)", self.language.value)
 
     async def synthesize(self, text: str) -> AsyncIterator[bytes]:
-        """Stream synthesized PCM audio for the given text."""
+        """Stream synthesized PCM audio for the given text with token-saving caching."""
+        norm_text = text.strip()
+        cache_key = (self.language.value, self.voice, norm_text)
+        if settings.enable_tts_cache and cache_key in _TTS_AUDIO_CACHE:
+            logger.info("TTS Cache HIT for '%s' (0 tokens consumed)", norm_text[:30])
+            for chunk in _TTS_AUDIO_CACHE[cache_key]:
+                yield chunk
+            return
+
         assert self._ws is not None, "TTS client not connected"
         await self._ws.send(json.dumps({"type": "synthesize", "text": text}))
+        collected_chunks: list[bytes] = []
         while True:
             msg = await self._inbox.get()
             mtype = msg.get("type")
             if mtype == "audio":
-                yield msg.get("audio", b"")
+                audio_data = msg.get("audio", b"")
+                if audio_data:
+                    collected_chunks.append(audio_data)
+                    yield audio_data
             elif mtype == "done":
+                if settings.enable_tts_cache and collected_chunks:
+                    _TTS_AUDIO_CACHE[cache_key] = collected_chunks
                 return
             elif mtype == "error":
                 raise RuntimeError(f"TTS error: {msg.get('error')}")

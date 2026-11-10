@@ -63,3 +63,25 @@ def test_summary_includes_questions() -> None:
     summary = build_summary(state)
     assert "dispatched" in summary
     assert "confirmed" in summary
+
+
+def test_calculate_pcm16_rms_silence_vs_sound() -> None:
+    from app.services.media_websocket import calculate_pcm16_rms
+    import struct
+
+    # 100 samples of pure silence (0s)
+    silence = b"\x00\x00" * 100
+    assert calculate_pcm16_rms(silence) == 0.0
+
+    # 100 samples of audible signal (amplitude 2000)
+    signal = struct.pack("<100h", *([2000] * 100))
+    rms = calculate_pcm16_rms(signal)
+    assert rms == 2000.0
+
+
+def test_concise_mode_token_reduction() -> None:
+    state = AgentState(task=_make_task(), call_id="c1")
+    greeting = build_opening_greeting(state)
+    assert "ನಮಸ್ತೆ" in greeting
+    # Concise mode should be crisp (< 50 chars) to save character tokens
+    assert len(greeting) <= 50

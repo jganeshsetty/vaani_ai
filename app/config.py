@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     gnani_timbre_ws_url: str = ""
     gnani_api_key: str = ""
 
+    # --- Free-Tier Token & Call Duration Optimization ---
+    vad_enabled: bool = True
+    vad_energy_threshold: int = 350
+    max_call_turns: int = 4
+    enable_tts_cache: bool = True
+    concise_mode: bool = True
+
     # --- Server ---
     host: str = "0.0.0.0"
     port: int = 8000

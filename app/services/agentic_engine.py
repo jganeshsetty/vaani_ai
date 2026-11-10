@@ -12,6 +12,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
+from app.config import settings
 from app.models import ConfirmationStatus, Language, TaskOut
 
 logger = logging.getLogger("vaani.agent")
@@ -68,7 +69,7 @@ def classify_response(text: str, question: str) -> ConfirmationStatus:
 
 @dataclass
 class AgentState:
-    """Mutable per-call agent state."""
+    """Mutable per-call agent state with configurable token-saving max turns."""
 
     task: TaskOut
     call_id: str
@@ -77,7 +78,7 @@ class AgentState:
     confirmed: dict[str, ConfirmationStatus] = field(default_factory=dict)
     transcript: list[dict] = field(default_factory=list)
     turn: int = 0
-    max_turns: int = 12
+    max_turns: int = field(default_factory=lambda: settings.max_call_turns)
     done: bool = False
     summary: Optional[str] = None
 
@@ -95,6 +96,13 @@ class AgentState:
 def build_opening_greeting(state: AgentState) -> str:
     """Build the first thing the agent says when the call connects."""
     lang = state.language
+    if settings.concise_mode:
+        if lang == Language.KANNADA:
+            return "ನಮಸ್ತೆ, ವಾಣಿಕಾಲ್ ಕಡೆಯಿಂದ ಕರೆ ಮಾಡ್ತಿದ್ದೀನಿ."
+        if lang == Language.KANGLISH:
+            return "Hello, I am calling from VaaniCall."
+        return "Hello, calling from VaaniCall regarding your task."
+
     if lang == Language.KANNADA:
         return "ನಮಸ್ತೆ, ನಾನು ವಾಣಿಯಾಳಿ. ನಾನು ನಿಮ್ಮ ಕೆಲೆಗೆ ಸಹಾಯ ಮಾಡಲು ಬಯಸುತ್ತೇನೆ."
     if lang == Language.KANGLISH:
@@ -116,7 +124,7 @@ def build_followup(state: AgentState, callee_text: str) -> Optional[str]:
     Returns the text to synthesize, or None when the call should end.
     """
     state.turn += 1
-    if state.turn > state.max_turns:
+    if state.turn >= state.max_turns:
         state.done = True
         return None
 
@@ -128,15 +136,15 @@ def build_followup(state: AgentState, callee_text: str) -> Optional[str]:
         state.mark_confirmed(question, status)
         lang = state.language
         if lang == Language.KANNADA:
-            return f" {_translit(question)}? ಹೌದು?"
+            return f"{_translit(question)}? ಹೌದಾ?"
         if lang == Language.KANGLISH:
-            return f" {question}? Do you know?"
-        return f" {question}?"
+            return f"{question}? Is that correct?"
+        return f"{question}?"
 
-    # No more questions — wrap up.
+    # No more questions — wrap up immediately.
     state.done = True
     if state.language == Language.KANNADA:
-        return "ಧನ್ಯವಾದ. ನಾನು ನಿಮ್ಮ ಮಾಹಿತಿ ದಾಖಲಿಸಿದ್ದೇನೆ."
+        return "ಧನ್ಯವಾದಗಳು, ನಾನು ನಿಮ್ಮ ಮಾಹಿತಿ ದಾಖಲಿಸಿದ್ದೇನೆ."
     if state.language == Language.KANGLISH:
         return "Thank you. I have noted the information."
     return "Thank you. I have noted the information."

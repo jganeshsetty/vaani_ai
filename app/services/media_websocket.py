@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
+import struct
 from typing import Optional
 
 import websockets
@@ -31,6 +33,16 @@ from app.services.task_service import get_task
 logger = logging.getLogger("vaani.media")
 
 
+def calculate_pcm16_rms(pcm_bytes: bytes) -> float:
+    """Calculate Root Mean Square (RMS) energy for 16-bit PCM to detect silence."""
+    count = len(pcm_bytes) // 2
+    if count == 0:
+        return 0.0
+    shorts = struct.unpack(f"<{count}h", pcm_bytes[: count * 2])
+    sum_squares = sum(s * s for s in shorts)
+    return math.sqrt(sum_squares / count)
+
+
 class ExotelMediaHandler:
     """Per-connection state for a single Exotel media WebSocket."""
 
@@ -43,6 +55,8 @@ class ExotelMediaHandler:
         self._stt_task: Optional[asyncio.Task] = None
         self._tts_task: Optional[asyncio.Task] = None
         self._closed = False
+        self._agent_speaking: bool = False
+        self._trailing_silence_count: int = 0
 
     async def handle(self, websocket) -> None:
         """Main entry point: accept the Exotel connection and run the loop."""
@@ -77,6 +91,21 @@ class ExotelMediaHandler:
         try:
             async for message in websocket:
                 if isinstance(message, bytes):
+                    # Half-duplex suppression: avoid streaming agent's own speech back to STT
+                    if self._agent_speaking:
+                        continue
+
+                    # Voice Activity Detection (VAD): suppress pure silence frames to save STT streaming tokens
+                    if settings.vad_enabled:
+                        rms = calculate_pcm16_rms(message)
+                        if rms < settings.vad_energy_threshold:
+                            self._trailing_silence_count += 1
+                            # Allow ~200ms padding then suppress streaming empty silence
+                            if self._trailing_silence_count > 10:
+                                continue
+                        else:
+                            self._trailing_silence_count = 0
+
                     await self.stt.send_audio(message)
                 else:
                     logger.debug("Non-binary frame from Exotel: %s", message)
@@ -108,15 +137,31 @@ class ExotelMediaHandler:
                 break
 
     async def _speak(self, text: str) -> None:
-        """Synthesize text and stream audio back to Exotel."""
+        """Synthesize text and stream audio back to Exotel with turn optimization."""
         assert self.tts is not None and self.exotel_ws is not None
+        self._agent_speaking = True
         self.agent.transcript.append({"role": "agent", "text": text})
         await append_transcript(self.call_id, {"role": "agent", "text": text})
-        async for audio_chunk in self.tts.synthesize(text):
-            try:
-                await self.exotel_ws.send(audio_chunk)
-            except ConnectionClosed:
-                return
+        try:
+            async for audio_chunk in self.tts.synthesize(text):
+                try:
+                    await self.exotel_ws.send(audio_chunk)
+                except ConnectionClosed:
+                    return
+        finally:
+            # Short grace period for echo dissipation before unmuting incoming stream
+            await asyncio.sleep(0.15)
+            self._agent_speaking = False
+
+        # Hang up Exotel call as soon as task is completed to save telephony minutes
+        if self.agent.done:
+            logger.info("Call goals completed for %s. Closing Exotel session to save minutes.", self.call_id)
+            await asyncio.sleep(0.5)
+            if self.exotel_ws is not None:
+                try:
+                    await self.exotel_ws.close(code=1000, reason="call_completed")
+                except Exception:
+                    pass
 
     async def _finalize(self) -> None:
         self._closed = True
