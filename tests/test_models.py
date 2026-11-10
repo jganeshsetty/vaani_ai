@@ -13,15 +13,16 @@ from app.services.agentic_engine import (
 
 
 def _make_task(**kwargs) -> TaskCreate:
-    return TaskCreate(
-        user_id="u1",
-        description="Call the store and ask if my laptop is dispatched",
-        language=Language.KANNADA,
-        target_number="+919999999999",
-        constraints=["be polite"],
-        questions_to_ask=["Is my laptop dispatched?", "When will it arrive?"],
-        **kwargs,
-    )
+    defaults = {
+        "user_id": "u1",
+        "description": "Call the store and ask if my laptop is dispatched",
+        "language": Language.KANNADA,
+        "target_number": "+919999999999",
+        "constraints": ["be polite"],
+        "questions_to_ask": ["Is my laptop dispatched?", "When will it arrive?"],
+    }
+    defaults.update(kwargs)
+    return TaskCreate(**defaults)
 
 
 def test_detect_language_kannada() -> None:
@@ -85,3 +86,21 @@ def test_concise_mode_token_reduction() -> None:
     assert "ನಮಸ್ತೆ" in greeting
     # Concise mode should be crisp (< 50 chars) to save character tokens
     assert len(greeting) <= 50
+
+
+def test_callee_says_hello_agent_starts_with_hello() -> None:
+    from app.services.agentic_engine import build_followup
+
+    # Callee answers saying "Hello?" in English
+    state_en = AgentState(task=_make_task(language=Language.ENGLISH, description="Call as Ganesh to ask about laptop"), call_id="c2", language=Language.ENGLISH)
+    reply_en = build_followup(state_en, "Hello? Who is this?")
+    assert reply_en is not None
+    assert reply_en.startswith("Hello!")
+    assert "Ganesh" in reply_en
+
+    # Callee answers saying "ಹಲೋ?" in Kannada
+    state_kn = AgentState(task=_make_task(language=Language.KANNADA, description="Call as Ganesh to ask about laptop"), call_id="c3", language=Language.KANNADA)
+    reply_kn = build_followup(state_kn, "ಹಲೋ, ಹೇಳಿ?")
+    assert reply_kn is not None
+    assert reply_kn.startswith("ಹಲೋ")
+    assert "Ganesh" in reply_kn

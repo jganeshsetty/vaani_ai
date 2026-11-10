@@ -1,196 +1,164 @@
-"""WebSocket clients for Gnani Prisma (STT) and Gnani Timbre (TTS).
+"""Client for Gnani.ai Vachana platform: Timbre (TTS) and Prisma (STT).
 
-Both services use a bidirectional WebSocket protocol. The client here is a
-thin async wrapper that opens a connection, sends an initial handshake and
-provides async generators for outgoing audio and incoming text/speech.
+Uses the official Gnani Vachana AI endpoints with X-API-Key-ID authentication.
+TTS: https://api.vachana.ai/api/v1/tts/inference
+STT: https://api.vachana.ai/stt/v3
 """
 from __future__ import annotations
 
-import asyncio
+import io
 import json
 import logging
+import wave
 from typing import AsyncIterator, Optional
 
-import websockets
-from websockets.exceptions import ConnectionClosed
+import httpx
 
 from app.config import settings
 from app.models import Language
 
 logger = logging.getLogger("vaani.gnani")
 
+_TTS_ENDPOINT = "https://api.vachana.ai/api/v1/tts/inference"
+_STT_ENDPOINT = "https://api.vachana.ai/stt/v3"
 
-class GnaniSTTClient:
-    """Streaming Speech-to-Text via Gnani Prisma."""
-
-    def __init__(
-        self,
-        url: Optional[str] = None,
-        api_key: Optional[str] = None,
-        language: Language = Language.KANNADA,
-        sample_rate: int = 8000,
-    ) -> None:
-        self.url = url or settings.gnani_prisma_ws_url
-        self.api_key = api_key or settings.gnani_api_key
-        self.language = language
-        self.sample_rate = sample_rate
-        self._ws = None
-        self._recv_task: Optional[asyncio.Task] = None
-        self._inbox: asyncio.Queue = asyncio.Queue()
-        self._closed = False
-
-    async def connect(self) -> None:
-        if not self.url:
-            raise RuntimeError("Gnani Prisma URL not configured")
-        headers = {}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-        self._ws = await websockets.connect(self.url, additional_headers=headers)
-        await self._ws.send(
-            json.dumps(
-                {
-                    "type": "start",
-                    "language": self.language.value,
-                    "sample_rate": self.sample_rate,
-                }
-            )
-        )
-        self._recv_task = asyncio.create_task(self._recv_loop())
-        logger.info("Gnani STT connected (%s)", self.language.value)
-
-    async def _recv_loop(self) -> None:
-        assert self._ws is not None
-        try:
-            async for raw in self._ws:
-                await self._inbox.put(json.loads(raw) if isinstance(raw, str) else raw)
-        except ConnectionClosed as exc:
-            logger.warning("Gnani STT connection closed: %s", exc)
-            await self._inbox.put({"type": "error", "error": str(exc)})
-        finally:
-            await self._inbox.put({"type": "closed"})
-
-    async def send_audio(self, audio: bytes) -> None:
-        """Send a chunk of PCM audio to the STT service."""
-        assert self._ws is not None, "STT client not connected"
-        await self._ws.send(audio)
-
-    async def transcripts(self) -> AsyncIterator[dict]:
-        """Yield transcript events from the STT service."""
-        while True:
-            msg = await self._inbox.get()
-            if msg.get("type") == "closed":
-                return
-            yield msg
-
-    async def close(self) -> None:
-        self._closed = True
-        if self._recv_task is not None:
-            self._recv_task.cancel()
-            try:
-                await self._recv_task
-            except (asyncio.CancelledError, Exception):
-                pass
-        if self._ws is not None:
-            try:
-                await self._ws.close()
-            except Exception:
-                pass
+# In-memory cache for repeated synthesized audio to save latency & tokens
+_TTS_CACHE: dict[tuple[str, str, str], bytes] = {}
 
 
-# In-memory cache for repeated synthesized audio phrases to minimize Gnani TTS token usage.
-_TTS_AUDIO_CACHE: dict[tuple[str, str, str], list[bytes]] = {}
+def get_gnani_lang_code(language: Language | str) -> str:
+    """Map language enum to Gnani language code."""
+    val = language.value if isinstance(language, Language) else str(language).lower()
+    if "kannada" in val or val == "kn":
+        return "kn-IN"
+    if "english" in val or val == "en":
+        return "en-IN"
+    if "kanglish" in val:
+        return "kn-IN"
+    return "kn-IN"
 
 
 class GnaniTTSClient:
-    """Streaming Text-to-Speech via Gnani Timbre."""
+    """Text-to-Speech client using Gnani Timbre."""
 
     def __init__(
         self,
-        url: Optional[str] = None,
         api_key: Optional[str] = None,
         language: Language = Language.KANNADA,
-        sample_rate: int = 8000,
-        voice: str = "default",
+        voice: str = "Aarohi",
     ) -> None:
-        self.url = url or settings.gnani_timbre_ws_url
+        self.api_key = api_key or settings.gnani_api_key
+        self.language = language
+        self.voice = voice or "Aarohi"
+
+    async def connect(self) -> None:
+        """Connection hook for backwards compatibility."""
+        if not self.api_key:
+            logger.warning("Gnani TTS: No API key provided.")
+
+    async def synthesize(self, text: str) -> AsyncIterator[bytes]:
+        """Stream synthesized audio chunks for media WebSocket streaming."""
+        audio_wav = await self.synthesize_wav(text)
+        # Yield in 320-byte chunks (standard 20ms at 8kHz PCM)
+        chunk_size = 320
+        for i in range(0, len(audio_wav), chunk_size):
+            yield audio_wav[i : i + chunk_size]
+
+    async def synthesize_wav(self, text: str) -> bytes:
+        """Synthesize text into a complete, standard WAV audio file."""
+        norm_text = text.strip()
+        lang_code = get_gnani_lang_code(self.language)
+        cache_key = (lang_code, self.voice, norm_text)
+
+        if settings.enable_tts_cache and cache_key in _TTS_CACHE:
+            logger.info("TTS Cache HIT for '%s'", norm_text[:30])
+            return _TTS_CACHE[cache_key]
+
+        if not self.api_key:
+            logger.warning("No Gnani API key, generating clean silent audio bytes.")
+            return b"\x00" * 3200
+
+        headers = {
+            "Content-Type": "application/json",
+            "X-API-Key-ID": self.api_key,
+        }
+        payload = {
+            "text": norm_text,
+            "model": "timbre-v2.5",
+            "voice": self.voice,
+            "language": lang_code,
+            "audio_config": {
+                "encoding": "linear_pcm",
+                "container": "wav",
+                "sample_rate": 16000,
+            },
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=20) as client:
+                resp = await client.post(_TTS_ENDPOINT, json=payload, headers=headers)
+                resp.raise_for_status()
+                audio_bytes = resp.content
+                if settings.enable_tts_cache:
+                    _TTS_CACHE[cache_key] = audio_bytes
+                logger.info("Gnani TTS synthesized %d bytes for '%s'", len(audio_bytes), norm_text[:30])
+                return audio_bytes
+        except Exception as exc:
+            logger.exception("Gnani TTS synthesis failed: %s", exc)
+            return b"\x00" * 3200
+
+    async def close(self) -> None:
+        pass
+
+
+class GnaniSTTClient:
+    """Speech-to-Text client using Gnani Prisma."""
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        language: Language = Language.KANNADA,
+        sample_rate: int = 16000,
+    ) -> None:
         self.api_key = api_key or settings.gnani_api_key
         self.language = language
         self.sample_rate = sample_rate
-        self.voice = voice
-        self._ws = None
-        self._inbox: asyncio.Queue = asyncio.Queue()
-        self._recv_task: Optional[asyncio.Task] = None
-        self._closed = False
 
     async def connect(self) -> None:
-        if not self.url:
-            raise RuntimeError("Gnani Timbre URL not configured")
-        headers = {}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-        self._ws = await websockets.connect(self.url, additional_headers=headers)
-        await self._ws.send(
-            json.dumps(
-                {
-                    "type": "start",
-                    "language": self.language.value,
-                    "sample_rate": self.sample_rate,
-                    "voice": self.voice,
-                }
-            )
-        )
-        self._recv_task = asyncio.create_task(self._recv_loop())
-        logger.info("Gnani TTS connected (%s)", self.language.value)
+        pass
 
-    async def synthesize(self, text: str) -> AsyncIterator[bytes]:
-        """Stream synthesized PCM audio for the given text with token-saving caching."""
-        norm_text = text.strip()
-        cache_key = (self.language.value, self.voice, norm_text)
-        if settings.enable_tts_cache and cache_key in _TTS_AUDIO_CACHE:
-            logger.info("TTS Cache HIT for '%s' (0 tokens consumed)", norm_text[:30])
-            for chunk in _TTS_AUDIO_CACHE[cache_key]:
-                yield chunk
-            return
+    async def transcribe(self, audio_bytes: bytes, filename: str = "audio.wav") -> str:
+        """Transcribe audio bytes (WAV/PCM/MP3) to text using Gnani Prisma."""
+        if not self.api_key:
+            logger.warning("Gnani STT: No API key provided.")
+            return ""
 
-        assert self._ws is not None, "TTS client not connected"
-        await self._ws.send(json.dumps({"type": "synthesize", "text": text}))
-        collected_chunks: list[bytes] = []
-        while True:
-            msg = await self._inbox.get()
-            mtype = msg.get("type")
-            if mtype == "audio":
-                audio_data = msg.get("audio", b"")
-                if audio_data:
-                    collected_chunks.append(audio_data)
-                    yield audio_data
-            elif mtype == "done":
-                if settings.enable_tts_cache and collected_chunks:
-                    _TTS_AUDIO_CACHE[cache_key] = collected_chunks
-                return
-            elif mtype == "error":
-                raise RuntimeError(f"TTS error: {msg.get('error')}")
-            elif mtype == "closed":
-                return
+        # If raw PCM without WAV header, wrap it with a 16kHz mono header
+        if not audio_bytes.startswith(b"RIFF"):
+            buf = io.BytesIO()
+            with wave.open(buf, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(self.sample_rate)
+                wf.writeframes(audio_bytes)
+            audio_bytes = buf.getvalue()
 
-    async def _recv_loop(self) -> None:
-        assert self._ws is not None
+        lang_code = get_gnani_lang_code(self.language)
+        headers = {"X-API-Key-ID": self.api_key}
+        files = {"audio_file": (filename, audio_bytes, "audio/wav")}
+        data = {"model": "prisma-v3.0", "language_code": lang_code}
+
         try:
-            async for raw in self._ws:
-                await self._inbox.put(json.loads(raw) if isinstance(raw, str) else raw)
-        except ConnectionClosed as exc:
-            logger.warning("Gnani TTS connection closed: %s", exc)
-            await self._inbox.put({"type": "closed"})
+            async with httpx.AsyncClient(timeout=25) as client:
+                resp = await client.post(_STT_ENDPOINT, files=files, data=data, headers=headers)
+                resp.raise_for_status()
+                res_data = resp.json()
+                transcript = res_data.get("transcript", "").strip()
+                logger.info("Gnani STT transcribed '%s' (request_id: %s)", transcript, res_data.get("request_id"))
+                return transcript
+        except Exception as exc:
+            logger.exception("Gnani STT transcription failed: %s", exc)
+            return ""
 
     async def close(self) -> None:
-        self._closed = True
-        if self._recv_task is not None:
-            self._recv_task.cancel()
-            try:
-                await self._recv_task
-            except (asyncio.CancelledError, Exception):
-                pass
-        if self._ws is not None:
-            try:
-                await self._ws.close()
-            except Exception:
-                pass
+        pass

@@ -19,6 +19,7 @@ def _serialize_call(doc: dict) -> CallOut:
         id=str(doc["_id"]),
         task_id=doc["task_id"],
         status=CallStatus(doc.get("status", CallStatus.INITIATED.value)),
+        target_number=doc.get("target_number"),
         exotel_call_sid=doc.get("exotel_call_sid"),
         exotel_media_sid=doc.get("exotel_media_sid"),
         transcript=doc.get("transcript", []),
@@ -28,13 +29,14 @@ def _serialize_call(doc: dict) -> CallOut:
     )
 
 
-async def create_call(task_id: str, language: Optional[Language] = None) -> CallOut:
+async def create_call(task_id: str, language: Optional[Language] = None, target_number: Optional[str] = None) -> CallOut:
     """Create a call record for a task."""
     col: AsyncIOMotorCollection = calls_collection()
     now = _now()
     doc = {
         "task_id": task_id,
         "status": CallStatus.INITIATED.value,
+        "target_number": target_number,
         "transcript": [],
         "verification": {},
         "language_detected": language.value if language else None,
@@ -50,7 +52,32 @@ async def get_call(call_id: str) -> Optional[CallOut]:
     from bson import ObjectId
 
     col: AsyncIOMotorCollection = calls_collection()
-    doc = await col.find_one({"_id": ObjectId(call_id)})
+    try:
+        doc = await col.find_one({"_id": ObjectId(call_id)})
+    except Exception:
+        doc = await col.find_one({"_id": call_id})
+    if doc is None:
+        return None
+    return _serialize_call(doc)
+
+
+async def get_call_by_exotel_sid(call_sid: str) -> Optional[CallOut]:
+    col: AsyncIOMotorCollection = calls_collection()
+    doc = await col.find_one({"exotel_call_sid": call_sid})
+    if doc is None:
+        return None
+    return _serialize_call(doc)
+
+
+async def get_latest_active_call() -> Optional[CallOut]:
+    col: AsyncIOMotorCollection = calls_collection()
+    doc = await col.find_one(
+        {"status": {"$in": [CallStatus.INITIATED.value, CallStatus.IN_PROGRESS.value]}},
+        sort=[("created_at", -1)],
+    )
+    if doc is None:
+        # Fall back to the most recent call
+        doc = await col.find_one({}, sort=[("created_at", -1)])
     if doc is None:
         return None
     return _serialize_call(doc)

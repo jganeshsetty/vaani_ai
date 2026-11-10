@@ -2,17 +2,28 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Optional
 
 import httpx
 
 from app.config import settings
 from app.models import Language, TaskOut
+from app.services import call_service
 
 logger = logging.getLogger("vaani.exotel")
 
 
-EXOTEL_MEDIA_WS_HOST = "exotel.com"  # placeholder; configured per-deployment
+def format_exotel_number(phone: str) -> str:
+    """Format an Indian phone number with leading 0 as required by Exotel."""
+    digits = re.sub(r"\D", "", phone)
+    if digits.startswith("91") and len(digits) == 12:
+        return f"0{digits[2:]}"
+    if len(digits) == 10:
+        return f"0{digits}"
+    if digits.startswith("0"):
+        return digits
+    return digits
 
 
 async def trigger_exotel_call(
@@ -21,38 +32,73 @@ async def trigger_exotel_call(
     target_number: Optional[str] = None,
     language: Language = Language.KANNADA,
 ) -> dict:
-    """Call the Exotel REST API to start a Voice AI session.
+    """Call the Exotel REST API to start a single-leg outbound voice call.
 
-    Returns the parsed JSON response. If credentials are not configured the call
-    is skipped and an empty dict is returned so the rest of the pipeline can
-    still run (useful for local development).
+    Connects directly to the recipient without bridging a second phone, avoiding
+    duplicate calls and 'wait while we connect your call' prompts.
     """
     if not settings.exotel_api_key or not settings.exotel_token:
         logger.warning("Exotel credentials missing — skipping trigger for call %s", call_id)
         return {"skipped": True, "reason": "no_credentials"}
 
-    number = target_number or task.target_number
-    if not number:
-        raise ValueError("No target phone number for task %s", task.id)
+    raw_number = target_number or task.target_number
+    if not raw_number:
+        raise ValueError(f"No target phone number for task {task.id}")
 
-    url = f"{settings.exotel_base_url}/connect/{settings.exotel_voice_ai_sid}/voice-ai"
-    payload = {
-        "from": number,
-        "to": number,
-        "language": language.value,
-        "media_ws_path": settings.media_ws_path,
-        "call_id": call_id,
-    }
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(
-            url,
-            json=payload,
-            auth=(settings.exotel_api_key, settings.exotel_token),
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    logger.info("Exotel triggered for call %s -> %s", call_id, data.get("sid"))
-    return data
+    number = format_exotel_number(raw_number)
+    account_sid = settings.exotel_voice_ai_sid or "student1873"
+    caller_id = settings.exotel_caller_id or "08047290621"
+    app_id = settings.exotel_app_id or "1380428"
+
+    url = f"{settings.exotel_base_url}/Accounts/{account_sid}/Calls/connect.json"
+
+    stream_base = settings.exotel_stream_url
+    if stream_base:
+        if stream_base.startswith("http://"):
+            stream_base = "ws://" + stream_base[7:]
+        elif stream_base.startswith("https://"):
+            stream_base = "wss://" + stream_base[8:]
+        elif not stream_base.startswith("ws"):
+            stream_base = f"wss://{stream_base}"
+        
+        ws_path = settings.media_ws_path
+        stream_url = f"{stream_base.rstrip('/')}{ws_path}?call_id={call_id}"
+        
+        payload = {
+            "From": number,
+            "CallerId": caller_id,
+            "StreamUrl": stream_url,
+            "StreamType": "bidirectional",
+            "CustomField": call_id,
+        }
+        logger.info("Triggering Exotel Voice AI Stream call: %s -> StreamUrl: %s", number, stream_url)
+    else:
+        payload = {
+            "From": number,
+            "CallerId": caller_id,
+            "Url": f"http://my.exotel.com/{account_sid}/exoml/start_voice/{app_id}",
+            "CustomField": call_id,
+        }
+        logger.info("Triggering Exotel Applet call: %s -> App: %s", number, app_id)
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                url,
+                data=payload,
+                auth=(settings.exotel_api_key, settings.exotel_token),
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            call_obj = data.get("Call", {})
+            call_sid = call_obj.get("Sid")
+            if call_sid:
+                await call_service.set_call_exotel(call_id, call_sid, media_sid=caller_id)
+            logger.info("Exotel call triggered: %s -> %s (Status: %s)", call_id, call_sid, call_obj.get("Status"))
+            return data
+    except Exception as exc:
+        logger.exception("Failed to connect Exotel call: %s", exc)
+        raise exc
 
 
 def media_ws_url(call_id: str) -> str:

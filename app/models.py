@@ -78,6 +78,7 @@ class CallOut(BaseModel):
     id: str
     task_id: str
     status: CallStatus = CallStatus.INITIATED
+    target_number: Optional[str] = None
     exotel_call_sid: Optional[str] = None
     exotel_media_sid: Optional[str] = None
     transcript: list[dict] = Field(default_factory=list)

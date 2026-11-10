@@ -19,11 +19,15 @@ class Settings(BaseSettings):
     exotel_token: str = ""
     exotel_base_url: str = "https://api.exotel.com/v1"
     exotel_voice_ai_sid: str = ""
+    exotel_caller_id: str = "08047290621"
+    exotel_app_id: str = "1380428"
+    exotel_stream_url: str = ""
     exotel_media_ws_path: str = "/media"
 
     # --- Gnani Prisma (STT) + Timbre (TTS) ---
-    gnani_prisma_ws_url: str = ""
-    gnani_timbre_ws_url: str = ""
+    # Default to Gnani's official Vachana AI endpoints; only VAANI_GNANI_API_KEY is required.
+    gnani_prisma_ws_url: str = "wss://api.vachana.ai/stt/v3/stream"
+    gnani_timbre_ws_url: str = "wss://api.vachana.ai/api/v1/tts"
     gnani_api_key: str = ""
 
     # --- Free-Tier Token & Call Duration Optimization ---

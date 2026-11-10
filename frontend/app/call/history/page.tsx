@@ -170,7 +170,7 @@ export default function CallHistoryPage() {
           filteredItems.map((item) => (
             <div
               key={item.id}
-              onClick={() => router.push(`/call/details`)}
+              onClick={() => router.push(`/call/${item.id}`)}
               className="bg-white rounded-2xl p-5 border border-[#eeece8] hover:border-[#28543e]/40 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group"
             >
               <div className="flex items-start gap-3.5 min-w-0">

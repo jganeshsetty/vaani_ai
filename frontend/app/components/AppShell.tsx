@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -10,12 +10,27 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
+  const [callerName, setCallerName] = useState('Ganesh');
+
+  useEffect(() => {
+    try {
+      const savedName = localStorage.getItem('vaani_caller_name');
+      if (savedName) setCallerName(savedName);
+    } catch (e) {}
+  }, []);
 
   const isNewCall = pathname === '/' || pathname === '/new-call';
   const isLiveCall = pathname === '/call/live';
   const isHistory = pathname === '/call/history';
   const isDetails = pathname?.startsWith('/call/') && !isLiveCall && !isHistory;
   const isStudio = pathname?.startsWith('/voice-studio');
+
+  const initials = callerName
+    .split(' ')
+    .filter(Boolean)
+    .map((p) => p[0].toUpperCase())
+    .slice(0, 2)
+    .join('') || 'G';
 
   return (
     <div className="min-h-screen bg-[#faf9f6] text-[#1a1c1a] font-sans antialiased">
@@ -36,7 +51,7 @@ export function AppShell({ children }: AppShellProps) {
         <nav className="flex-1 space-y-1.5">
           <Link
             href="/"
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] transition-all ${
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] min-h-[44px] transition-all ${
               isNewCall
                 ? 'bg-[#eaf2ec] text-[#28543e] font-semibold'
                 : 'text-[#58605c] hover:bg-[#f6f5f2] hover:text-[#1a1c1a] font-medium'
@@ -48,7 +63,7 @@ export function AppShell({ children }: AppShellProps) {
 
           <Link
             href="/call/live"
-            className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[14px] transition-all ${
+            className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[14px] min-h-[44px] transition-all ${
               isLiveCall
                 ? 'bg-[#28543e] text-white font-semibold shadow-sm'
                 : 'text-[#58605c] hover:bg-[#f6f5f2] hover:text-[#1a1c1a] font-medium'
@@ -79,7 +94,7 @@ export function AppShell({ children }: AppShellProps) {
 
           <Link
             href="/call/history"
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] transition-all ${
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] min-h-[44px] transition-all ${
               isHistory
                 ? 'bg-[#eaf2ec] text-[#28543e] font-semibold'
                 : 'text-[#58605c] hover:bg-[#f6f5f2] hover:text-[#1a1c1a] font-medium'
@@ -91,7 +106,7 @@ export function AppShell({ children }: AppShellProps) {
 
           <Link
             href="/call/details"
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] transition-all ${
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] min-h-[44px] transition-all ${
               isDetails
                 ? 'bg-[#eaf2ec] text-[#28543e] font-semibold'
                 : 'text-[#58605c] hover:bg-[#f6f5f2] hover:text-[#1a1c1a] font-medium'
@@ -103,7 +118,7 @@ export function AppShell({ children }: AppShellProps) {
 
           <Link
             href="/voice-studio/settings"
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] transition-all ${
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] min-h-[44px] transition-all ${
               isStudio
                 ? 'bg-[#eaf2ec] text-[#28543e] font-semibold'
                 : 'text-[#58605c] hover:bg-[#f6f5f2] hover:text-[#1a1c1a] font-medium'
@@ -120,7 +135,7 @@ export function AppShell({ children }: AppShellProps) {
             <span className="w-2 h-2 rounded-full bg-[#28543e] animate-pulse shrink-0" />
             <div className="flex flex-col min-w-0">
               <span className="text-[12px] font-semibold text-[#28543e] leading-tight">Kannada Voice Engine</span>
-              <span className="text-[10.5px] text-[#717973] truncate">Natural conversational flow</span>
+              <span className="text-[10.5px] text-[#717973] truncate">Casual & Informal Mode</span>
             </div>
           </div>
         </div>
@@ -128,10 +143,10 @@ export function AppShell({ children }: AppShellProps) {
         {/* Profile Card */}
         <div className="pt-2 px-2 flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-[#eaf2ec] text-[#28543e] flex items-center justify-center font-bold text-xs ring-2 ring-[#eaf2ec] shrink-0">
-            SK
+            {initials}
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-[13px] font-medium text-[#1a1c1a] truncate leading-tight">Sunil Kumar</span>
+            <span className="text-[13px] font-semibold text-[#1a1c1a] truncate leading-tight">{callerName}</span>
             <span className="text-[11px] text-[#717973] truncate">Personal Account</span>
           </div>
         </div>
@@ -168,11 +183,11 @@ export function AppShell({ children }: AppShellProps) {
 
             <div className="flex items-center gap-2">
               <div className="text-right hidden sm:block">
-                <div className="text-xs font-semibold text-[#1a1c1a] leading-tight">Sunil Kumar</div>
+                <div className="text-xs font-semibold text-[#1a1c1a] leading-tight">{callerName}</div>
                 <div className="text-[11px] text-[#717973] leading-tight">+91 98450 •••••</div>
               </div>
               <div className="w-8 h-8 rounded-full bg-[#eaf2ec] text-[#28543e] font-semibold text-xs flex items-center justify-center border border-[#d2ded5]">
-                SK
+                {initials}
               </div>
             </div>
           </div>
@@ -182,11 +197,11 @@ export function AppShell({ children }: AppShellProps) {
         <main className="flex-1 pb-20 md:pb-8">{children}</main>
       </div>
 
-      {/* Mobile Bottom Navigation */}
+      {/* Mobile Bottom Navigation with Min 44px Touch Targets */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white/95 backdrop-blur-md border-t border-[#eeece8] z-50 flex items-center justify-around px-2">
         <Link
           href="/"
-          className={`flex flex-col items-center gap-0.5 py-1 px-2 ${
+          className={`min-h-[48px] min-w-[54px] flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-lg ${
             isNewCall ? 'text-[#28543e] font-bold' : 'text-[#58605c]'
           }`}
         >
@@ -195,7 +210,7 @@ export function AppShell({ children }: AppShellProps) {
         </Link>
         <Link
           href="/call/live"
-          className={`flex flex-col items-center gap-0.5 py-1 px-2 ${
+          className={`min-h-[48px] min-w-[54px] flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-lg ${
             isLiveCall ? 'text-[#28543e] font-bold' : 'text-[#58605c]'
           }`}
         >
@@ -206,7 +221,7 @@ export function AppShell({ children }: AppShellProps) {
         </Link>
         <Link
           href="/call/history"
-          className={`flex flex-col items-center gap-0.5 py-1 px-2 ${
+          className={`min-h-[48px] min-w-[54px] flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-lg ${
             isHistory ? 'text-[#28543e] font-bold' : 'text-[#58605c]'
           }`}
         >
@@ -215,7 +230,7 @@ export function AppShell({ children }: AppShellProps) {
         </Link>
         <Link
           href="/call/details"
-          className={`flex flex-col items-center gap-0.5 py-1 px-2 ${
+          className={`min-h-[48px] min-w-[54px] flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-lg ${
             isDetails ? 'text-[#28543e] font-bold' : 'text-[#58605c]'
           }`}
         >
@@ -224,7 +239,7 @@ export function AppShell({ children }: AppShellProps) {
         </Link>
         <Link
           href="/voice-studio/settings"
-          className={`flex flex-col items-center gap-0.5 py-1 px-2 ${
+          className={`min-h-[48px] min-w-[54px] flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-lg ${
             isStudio ? 'text-[#28543e] font-bold' : 'text-[#58605c]'
           }`}
         >
@@ -235,4 +250,3 @@ export function AppShell({ children }: AppShellProps) {
     </div>
   );
 }
-

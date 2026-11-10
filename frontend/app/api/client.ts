@@ -20,6 +20,7 @@ export interface Call {
   id: string;
   task_id: string;
   status: 'initiated' | 'in_progress' | 'completed' | 'failed';
+  target_number?: string | null;
   exotel_call_sid: string | null;
   exotel_media_sid: string | null;
   transcript: TranscriptEntry[];
@@ -74,15 +75,39 @@ export async function startCall(data: {
   return res.json();
 }
 
+export async function fetchCalls(taskId?: string): Promise<Call[]> {
+  const url = taskId ? `${API_BASE}/calls?task_id=${taskId}` : `${API_BASE}/calls`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to fetch calls');
+  return res.json();
+}
+
 export async function fetchCall(callId: string): Promise<Call> {
   const res = await fetch(`${API_BASE}/calls/${callId}`);
   if (!res.ok) throw new Error('Failed to fetch call');
   return res.json();
 }
 
-export async function fetchCalls(taskId?: string): Promise<Call[]> {
-  const url = taskId ? `${API_BASE}/calls?task_id=${taskId}` : `${API_BASE}/calls`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('Failed to fetch calls');
+export async function fetchTask(taskId: string): Promise<Task> {
+  const res = await fetch(`${API_BASE}/tasks/${taskId}`);
+  if (!res.ok) throw new Error('Failed to fetch task');
+  return res.json();
+}
+
+export async function completeCall(callId: string, summary: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/calls/${callId}/complete?summary=${encodeURIComponent(summary)}`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error('Failed to complete call');
+  return res.json();
+}
+
+export async function postTranscriptEntry(callId: string, entry: any): Promise<any> {
+  const res = await fetch(`${API_BASE}/calls/${callId}/transcript`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+  });
+  if (!res.ok) throw new Error('Failed to post transcript');
   return res.json();
 }

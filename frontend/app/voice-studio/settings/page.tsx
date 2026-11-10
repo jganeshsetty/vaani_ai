@@ -1,64 +1,317 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+
+interface VoiceProfile {
+  id: string;
+  name: string;
+  tag: string;
+  description: string;
+  languages: string;
+  gender: string;
+  audioUrl?: string;
+  isCustom?: boolean;
+}
+
+const DEFAULT_PROFILES: VoiceProfile[] = [
+  {
+    id: 'aarohi',
+    name: 'Aarohi (Studio Kannada)',
+    tag: 'Native Studio',
+    description: 'Warm, natural Bangalore Kannada tone. Great for vendor confirmations and inquiries.',
+    languages: 'Kannada + English',
+    gender: 'Female • Expressive',
+  },
+  {
+    id: 'sunil',
+    name: 'Personal Voice Clone',
+    tag: 'Cloned Voice',
+    description: 'Your personalized voice model. Speaks naturally as you on any phone call.',
+    languages: 'Kannada Native',
+    gender: 'Male • Personalized',
+  },
+  {
+    id: 'kiran',
+    name: 'Kiran (Direct & Casual)',
+    tag: 'Casual Male',
+    description: 'Friendly peer-to-peer tone. Sounds like a friend or colleague calling.',
+    languages: 'Kannada + Kanglish',
+    gender: 'Male • Crisp',
+  },
+];
 
 export default function VoiceStudioSettingsPage() {
-  const [activeTab, setActiveTab] = useState<'profiles' | 'language' | 'advanced'>('profiles');
-  const [selectedVoice, setSelectedVoice] = useState('aarohi');
+  const [activeTab, setActiveTab] = useState<'profiles' | 'persona' | 'tuning'>('profiles');
+  const [selectedVoice, setSelectedVoice] = useState('sunil');
+  const [callerName, setCallerName] = useState('Ganesh');
+  const [conversationalTone, setConversationalTone] = useState<'informal' | 'formal'>('informal');
+  const [hideAiIdentity, setHideAiIdentity] = useState(true);
   const [speakingSpeed, setSpeakingSpeed] = useState(1.0);
-  const [naturalPause, setNaturalPause] = useState('medium');
-  const [codeSwitching, setCodeSwitching] = useState(true);
-  const [playingPreview, setPlayingPreview] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const handlePlaySample = () => {
-    setPlayingPreview(true);
-    setTimeout(() => setPlayingPreview(false), 2500);
-  };
+  // Audio preview state
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
+  const [customVoiceName, setCustomVoiceName] = useState('');
+  const [cloneCreated, setCloneCreated] = useState(false);
+
+  // Voice profiles list (defaults + custom)
+  const [voiceProfiles, setVoiceProfiles] = useState<VoiceProfile[]>(DEFAULT_PROFILES);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Load saved preferences and custom cloned profiles from localStorage
+  useEffect(() => {
+    try {
+      const savedName = localStorage.getItem('vaani_caller_name');
+      if (savedName) setCallerName(savedName);
+
+      const savedVoice = localStorage.getItem('vaani_selected_voice');
+      if (savedVoice) setSelectedVoice(savedVoice);
+
+      const savedTone = localStorage.getItem('vaani_caller_tone');
+      if (savedTone === 'formal' || savedTone === 'informal') setConversationalTone(savedTone);
+
+      const savedHideAi = localStorage.getItem('vaani_hide_ai');
+      if (savedHideAi !== null) setHideAiIdentity(savedHideAi === 'true');
+
+      const savedVoices = localStorage.getItem('vaani_custom_voices');
+      if (savedVoices) {
+        const parsed = JSON.parse(savedVoices);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setVoiceProfiles([...parsed, ...DEFAULT_PROFILES]);
+        }
+      }
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  // Save general settings
   const handleSave = () => {
+    try {
+      localStorage.setItem('vaani_caller_name', callerName);
+      localStorage.setItem('vaani_selected_voice', selectedVoice);
+      localStorage.setItem('vaani_caller_tone', conversationalTone);
+      localStorage.setItem('vaani_hide_ai', String(hideAiIdentity));
+    } catch {}
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
 
+  // Play audio preview for a specific voice profile
+  const handlePlayVoicePreview = (profile: VoiceProfile) => {
+    // If currently playing, stop it
+    if (activeAudioRef.current) {
+      activeAudioRef.current.pause();
+      activeAudioRef.current = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+
+    if (playingVoiceId === profile.id) {
+      setPlayingVoiceId(null);
+      return;
+    }
+
+    setPlayingVoiceId(profile.id);
+
+    // 1. If profile has a real recorded audio URL, play it directly!
+    if (profile.audioUrl) {
+      const audio = new Audio(profile.audioUrl);
+      activeAudioRef.current = audio;
+      audio.onended = () => setPlayingVoiceId(null);
+      audio.onerror = () => setPlayingVoiceId(null);
+      audio.play().catch((err) => {
+        console.warn('Audio playback error:', err);
+        setPlayingVoiceId(null);
+      });
+      return;
+    }
+
+    // 2. Otherwise play melodic tone + browser speech preview
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        const ctx = new AudioContextClass();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = profile.id === 'sunil' ? 'triangle' : 'sine';
+        osc.frequency.setValueAtTime(profile.id === 'sunil' ? 220 : 440, ctx.currentTime);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.3);
+      }
+
+      if ('speechSynthesis' in window) {
+        const text =
+          profile.id === 'sunil' || profile.isCustom
+            ? `ಹಲೋ, ನಮಸ್ತೆ! ನಾನು ${callerName}. ಆರಾಮಾಗಿದ್ದೀರಾ?`
+            : `ಹಲೋ, ನಮಸ್ಕಾರ! ನಾನು ಆರೋಹಿ. ನಿಮ್ಮ ಕೆಲಸವನ್ನು ನಾನು ಮಾತನಾಡುತ್ತೇನೆ.`;
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = speakingSpeed;
+        utterance.pitch = profile.id === 'sunil' ? 0.95 : 1.1;
+        utterance.onend = () => setPlayingVoiceId(null);
+        utterance.onerror = () => setPlayingVoiceId(null);
+        window.speechSynthesis.speak(utterance);
+      } else {
+        setTimeout(() => setPlayingVoiceId(null), 1800);
+      }
+    } catch {
+      setTimeout(() => setPlayingVoiceId(null), 1200);
+    }
+  };
+
+  // Start Live Microphone Recording
+  const startRecording = async () => {
+    try {
+      audioChunksRef.current = [];
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64data = reader.result as string;
+          setRecordedAudioUrl(base64data);
+        };
+        reader.readAsDataURL(audioBlob);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorder.start(250);
+      setIsRecording(true);
+      setRecordSeconds(0);
+
+      timerRef.current = setInterval(() => {
+        setRecordSeconds((prev) => {
+          if (prev >= 30) {
+            stopRecording();
+            return 30;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+    } catch {
+      alert('Microphone access was denied or is not supported. You can upload an audio file below.');
+    }
+  };
+
+  // Stop Live Recording
+  const stopRecording = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  };
+
+  // Save Recorded Voice as New Profile in state & localStorage
+  const handleSaveClone = () => {
+    if (!recordedAudioUrl) {
+      alert('Please record your voice or upload an audio sample first.');
+      return;
+    }
+
+    const name = customVoiceName.trim() || `${callerName || 'Ganesh'}'s Custom Voice`;
+    const newId = `clone_${Date.now()}`;
+    const newProfile: VoiceProfile = {
+      id: newId,
+      name,
+      tag: 'My Voice Clone',
+      description: `Cloned voice model for ${callerName}. Speaks naturally with native cadence.`,
+      languages: 'Kannada + Kanglish',
+      gender: 'Personal Clone',
+      audioUrl: recordedAudioUrl,
+      isCustom: true,
+    };
+
+    const updated = [newProfile, ...voiceProfiles.filter((p) => p.id !== newId)];
+    setVoiceProfiles(updated);
+    setSelectedVoice(newId);
+
+    try {
+      const customOnly = updated.filter((p) => p.isCustom);
+      localStorage.setItem('vaani_custom_voices', JSON.stringify(customOnly));
+      localStorage.setItem('vaani_selected_voice', newId);
+    } catch {}
+
+    setCloneCreated(true);
+    setTimeout(() => setCloneCreated(false), 3500);
+  };
+
+  // Handle Audio File Upload
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64data = reader.result as string;
+        setRecordedAudioUrl(base64data);
+        setCustomVoiceName(file.name.replace(/\.[^/.]+$/, ''));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
-    <div className="w-full pt-4 pb-12 px-4 sm:px-8 max-w-5xl mx-auto space-y-6">
+    <div className="w-full pt-4 pb-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#1a1c1a] tracking-tight">Voice Studio &amp; Settings</h1>
-          <p className="text-sm text-[#58605c] mt-1">
-            Manage synthesis profiles, language priorities, natural conversational pauses, and voice cloning
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#1a1c1a] tracking-tight">Voice Studio &amp; Persona</h1>
+          <p className="text-xs sm:text-sm text-[#58605c] mt-1">
+            Configure your personal voice clone, conversational identity, and informal tone
           </p>
         </div>
         <button
           type="button"
           onClick={handleSave}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#28543e] hover:bg-[#1d3f2f] text-white text-xs sm:text-sm font-semibold transition shadow-xs self-start sm:self-center"
+          className="min-h-[44px] inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#28543e] hover:bg-[#1d3f2f] active:scale-[0.98] text-white text-xs sm:text-sm font-semibold transition-all shadow-xs self-start sm:self-center cursor-pointer"
         >
           <span className="material-symbols-outlined text-base">
             {saved ? 'check' : 'save'}
           </span>
-          <span>{saved ? 'Saved Successfully!' : 'Save Changes'}</span>
+          <span>{saved ? 'Settings Saved!' : 'Save Changes'}</span>
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-[#eeece8] gap-4">
+      <div className="flex border-b border-[#eeece8] gap-4 sm:gap-6 overflow-x-auto scrollbar-none">
         {[
-          { id: 'profiles', label: 'Voice Profiles', icon: 'graphic_eq' },
-          { id: 'language', label: 'Language & Vernacular', icon: 'translate' },
-          { id: 'advanced', label: 'Speech Tuning', icon: 'tune' },
+          { id: 'profiles', label: 'Voice Profiles & Cloning', icon: 'graphic_eq' },
+          { id: 'persona', label: 'Caller Persona & Identity', icon: 'person' },
+          { id: 'tuning', label: 'Speech Tuning', icon: 'tune' },
         ].map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 pb-3 text-sm font-semibold border-b-2 transition-all ${
+            className={`min-h-[44px] flex items-center gap-2 pb-3 px-1 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap cursor-pointer ${
               activeTab === tab.id
                 ? 'border-[#28543e] text-[#28543e]'
-                : 'border-transparent text-[#58605c] hover:text-[#1a1c1a]'
+                : 'border-transparent text-[#717973] hover:text-[#1a1c1a]'
             }`}
           >
             <span className="material-symbols-outlined text-lg">{tab.icon}</span>
@@ -67,206 +320,258 @@ export default function VoiceStudioSettingsPage() {
         ))}
       </div>
 
-      {/* Active Voice Engine Banner */}
-      <div className="bg-white rounded-2xl p-6 border border-[#eeece8] shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-[#eaf2ec] text-[#28543e] flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-2xl">mic</span>
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-[#1a1c1a]">Gnani Timbre v2.5 Kannada Neural Engine</h2>
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                Connected
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-[#58605c] mt-0.5">
-              High-fidelity acoustic model optimized for native Karnataka Kannada dialects with zero robotic jitter.
-            </p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={handlePlaySample}
-          className="shrink-0 px-4 py-2.5 rounded-xl border border-[#d2ded5] bg-[#f3f7f4] hover:bg-[#eaf2ec] text-[#28543e] text-xs font-semibold transition flex items-center gap-2"
-        >
-          <span className="material-symbols-outlined text-[18px]">
-            {playingPreview ? 'volume_up' : 'play_circle'}
-          </span>
-          <span>{playingPreview ? 'Playing Kannada sample...' : 'Test Voice Sample'}</span>
-        </button>
-      </div>
-
-      {/* Tab: Voice Profiles */}
+      {/* Tab 1: Profiles & Voice Cloning */}
       {activeTab === 'profiles' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Aarohi */}
-            <div
-              onClick={() => setSelectedVoice('aarohi')}
-              className={`p-5 rounded-2xl border cursor-pointer transition-all ${
-                selectedVoice === 'aarohi'
-                  ? 'border-[#28543e] bg-white ring-2 ring-[#28543e]/20 shadow-xs'
-                  : 'border-[#eeece8] bg-white hover:border-[#d2ded5]'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#eaf2ec] text-[#28543e]">
-                  Default Voice
-                </span>
-                <span className="material-symbols-outlined text-[#28543e]">
-                  {selectedVoice === 'aarohi' ? 'check_circle' : 'radio_button_unchecked'}
-                </span>
+          {/* Real Voice Clone Recorder Card */}
+          <div className="bg-white rounded-2xl border border-[#d2ded5] p-5 sm:p-7 shadow-xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-[#eaf2ec] text-[#28543e] text-xs font-semibold mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#28543e] animate-pulse" />
+                  <span>Real Microphone Recording &amp; Voice Clone</span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-bold text-[#1a1c1a]">Clone Your Voice</h2>
+                <p className="text-xs sm:text-sm text-[#58605c] mt-0.5">
+                  Record 10–30 seconds of your voice speaking naturally in Kannada or English to generate your personal clone.
+                </p>
               </div>
-              <h3 className="font-bold text-base text-[#1a1c1a]">Aarohi</h3>
-              <p className="text-xs text-[#58605c] mt-1 leading-relaxed">
-                Warm, polite, and reassuring tone. Ideal for vendor confirmations and order enquiries.
-              </p>
-              <div className="mt-4 pt-3 border-t border-[#eeece8] flex items-center justify-between text-xs text-[#717973]">
-                <span>Kannada + English</span>
-                <span className="font-medium text-[#28543e]">Female • Natural</span>
-              </div>
+              {cloneCreated && (
+                <div className="px-3.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-300 text-xs font-semibold text-emerald-800 flex items-center gap-1.5 animate-bounce">
+                  <span className="material-symbols-outlined text-base text-emerald-600">check_circle</span>
+                  <span>Voice Clone Created &amp; Saved!</span>
+                </div>
+              )}
             </div>
 
-            {/* Sunil Clone */}
-            <div
-              onClick={() => setSelectedVoice('sunil')}
-              className={`p-5 rounded-2xl border cursor-pointer transition-all ${
-                selectedVoice === 'sunil'
-                  ? 'border-[#28543e] bg-white ring-2 ring-[#28543e]/20 shadow-xs'
-                  : 'border-[#eeece8] bg-white hover:border-[#d2ded5]'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#f3f7f4] text-[#1a1c1a]">
-                  Cloned Voice
-                </span>
-                <span className="material-symbols-outlined text-[#28543e]">
-                  {selectedVoice === 'sunil' ? 'check_circle' : 'radio_button_unchecked'}
-                </span>
-              </div>
-              <h3 className="font-bold text-base text-[#1a1c1a]">Sunil (Personal Clone)</h3>
-              <p className="text-xs text-[#58605c] mt-1 leading-relaxed">
-                Personalized clone from your 30s sample. Sounds like you making the call directly.
-              </p>
-              <div className="mt-4 pt-3 border-t border-[#eeece8] flex items-center justify-between text-xs text-[#717973]">
-                <span>Kannada Native</span>
-                <span className="font-medium text-[#28543e]">Male • Personalized</span>
-              </div>
+            {/* Script Suggestion */}
+            <div className="p-4 rounded-xl bg-[#faf9f6] border border-[#e2e1dd] text-xs sm:text-sm text-[#4d5550] leading-relaxed">
+              <span className="font-semibold text-[#1a1c1a] block mb-1">Suggested Kannada Recording Script:</span>
+              &ldquo;ಹಲೋ ನಮಸ್ಕಾರ, ನಾನು {callerName}. ನಾನು ಬೆಂಗಳೂರಿನಲ್ಲಿ ವಾಸವಾಗಿದ್ದೇನೆ. ನನಗೆ ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಲು ತುಂಬಾ ಇಷ್ಟ. ನನ್ನ ಎಲ್ಲಾ ಕಾಲ್‌ಗಳನ್ನು ನನ್ನ ಧ್ವನಿಯಲ್ಲೇ ಮಾಡಿ.&rdquo;
             </div>
 
-            {/* Kiran */}
-            <div
-              onClick={() => setSelectedVoice('kiran')}
-              className={`p-5 rounded-2xl border cursor-pointer transition-all ${
-                selectedVoice === 'kiran'
-                  ? 'border-[#28543e] bg-white ring-2 ring-[#28543e]/20 shadow-xs'
-                  : 'border-[#eeece8] bg-white hover:border-[#d2ded5]'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#f6f5f2] text-[#58605c]">
-                  Business
-                </span>
-                <span className="material-symbols-outlined text-[#28543e]">
-                  {selectedVoice === 'kiran' ? 'check_circle' : 'radio_button_unchecked'}
-                </span>
-              </div>
-              <h3 className="font-bold text-base text-[#1a1c1a]">Kiran</h3>
-              <p className="text-xs text-[#58605c] mt-1 leading-relaxed">
-                Crisp, formal, and authoritative. Best suited for utility calls, clinics, and official requests.
-              </p>
-              <div className="mt-4 pt-3 border-t border-[#eeece8] flex items-center justify-between text-xs text-[#717973]">
-                <span>Kannada + English</span>
-                <span className="font-medium text-[#28543e]">Male • Crisp</span>
-              </div>
-            </div>
-          </div>
+            {/* Recording Controls */}
+            <div className="flex flex-col sm:flex-row items-center gap-4 pt-1">
+              {!isRecording ? (
+                <button
+                  type="button"
+                  onClick={startRecording}
+                  className="w-full sm:w-auto min-h-[48px] px-6 py-3 rounded-xl bg-[#28543e] hover:bg-[#1d3f2f] text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 shadow-xs transition"
+                >
+                  <span className="material-symbols-outlined text-xl text-red-300">mic</span>
+                  <span>Start Recording Microphone</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={stopRecording}
+                  className="w-full sm:w-auto min-h-[48px] px-6 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 shadow-sm animate-pulse transition"
+                >
+                  <span className="w-3 h-3 rounded-xs bg-white" />
+                  <span>Stop Recording ({recordSeconds}s / 30s)</span>
+                </button>
+              )}
 
-          {/* Voice Cloning Studio Box */}
-          <div className="bg-white rounded-2xl p-6 border border-[#eeece8] shadow-xs space-y-4">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-lg text-[#28543e]">record_voice_over</span>
-              <h3 className="font-bold text-base text-[#1a1c1a]">Clone a New Voice</h3>
-            </div>
-            <p className="text-xs sm:text-sm text-[#58605c]">
-              Record 30 seconds of clear speech reading the Kannada sample passage below. The Gnani engine will generate your instant voice model.
-            </p>
-            <div className="p-4 rounded-xl bg-[#f6f5f2] text-sm text-[#1a1c1a] italic leading-relaxed border border-[#e2e1dd]">
-              &ldquo;ನಮಸ್ಕಾರ, ನಾನು ಪ್ರತಿದಿನ ಬೆಳಗ್ಗೆ ಕಚೇರಿಗೆ ಹೋಗುವ ಮುನ್ನ ದಿನಪತ್ರಿಕೆ ಓದುತ್ತೇನೆ. ಬೆಂಗಳೂರಿನ ಸುಂದರ ವಾತಾವರಣ ನನಗೆ ತುಂಬಾ ಇಷ್ಟ.&rdquo;
-            </div>
-            <div className="flex items-center gap-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="audio/*"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+
               <button
                 type="button"
-                onClick={() => setIsRecording(!isRecording)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2 ${
-                  isRecording
-                    ? 'bg-[#c0392b] text-white animate-pulse'
-                    : 'bg-[#28543e] text-white hover:bg-[#1d3f2f]'
-                }`}
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full sm:w-auto min-h-[48px] px-5 py-3 rounded-xl border border-[#c1c9c1] hover:bg-[#f6f5f2] text-[#4d5550] text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition"
               >
-                <span className="material-symbols-outlined text-base">
-                  {isRecording ? 'stop' : 'mic'}
-                </span>
-                <span>{isRecording ? 'Stop Recording' : 'Start 30s Recording'}</span>
+                <span className="material-symbols-outlined text-lg">upload_file</span>
+                <span>Upload Audio File</span>
               </button>
-              {isRecording && <span className="text-xs text-[#c0392b] font-mono font-medium">Recording: 00:14 / 00:30</span>}
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* Tab: Language & Vernacular */}
-      {activeTab === 'language' && (
-        <div className="bg-white rounded-2xl p-6 border border-[#eeece8] shadow-xs space-y-6">
-          <div className="space-y-1">
-            <h3 className="font-bold text-base text-[#1a1c1a]">Vernacular Language Modes</h3>
-            <p className="text-xs sm:text-sm text-[#58605c]">Configure how the assistant greets and switches between languages</p>
-          </div>
+            {/* Audio Playback of Recorded Sample */}
+            {recordedAudioUrl && (
+              <div className="p-4 rounded-xl bg-[#eaf2ec]/40 border border-[#28543e]/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[#28543e] flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-base">audio_file</span>
+                    <span>Recorded Voice Sample Ready</span>
+                  </span>
+                  <span className="text-[11px] text-[#717973]">Listen before creating clone</span>
+                </div>
 
-          <div className="space-y-4 pt-2">
-            <div className="flex items-center justify-between p-4 rounded-xl bg-[#f6f5f2] border border-[#e2e1dd]">
-              <div>
-                <div className="text-sm font-bold text-[#1a1c1a]">Seamless Kanglish Code-Switching</div>
-                <div className="text-xs text-[#58605c] mt-0.5">
-                  Allows speaking natural Bangalore-style Kannada with common English terms (&ldquo;dispatched&rdquo;, &ldquo;courier&rdquo;, &ldquo;expected date&rdquo;).
+                <audio controls src={recordedAudioUrl} className="w-full h-10 rounded-lg outline-none" />
+
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                  <input
+                    type="text"
+                    value={customVoiceName}
+                    onChange={(e) => setCustomVoiceName(e.target.value)}
+                    placeholder={`${callerName}'s Personal Clone Name`}
+                    className="flex-1 min-h-[44px] px-3.5 bg-white border border-[#c1c9c1] rounded-xl text-xs sm:text-sm font-medium outline-none focus:ring-2 focus:ring-[#28543e]/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveClone}
+                    className="min-h-[44px] px-6 py-2.5 rounded-xl bg-[#28543e] hover:bg-[#1d3f2f] text-white text-xs sm:text-sm font-semibold shadow-xs transition"
+                  >
+                    Save &amp; Activate Voice Clone
+                  </button>
                 </div>
               </div>
-              <input
-                type="checkbox"
-                checked={codeSwitching}
-                onChange={(e) => setCodeSwitching(e.target.checked)}
-                className="w-5 h-5 rounded text-[#28543e] accent-[#28543e] cursor-pointer"
-              />
-            </div>
+            )}
+          </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-[#1a1c1a]">Default Vernacular Greeting</label>
-              <input
-                type="text"
-                defaultValue="ನಮಸ್ಕಾರ, ನಾನು ಸುನಿಲ್ ಅವರ ಪರವಾಗಿ ಕರೆ ಮಾಡುತ್ತಿದ್ದೇನೆ."
-                className="w-full p-3 bg-[#f6f5f2] rounded-xl text-sm text-[#1a1c1a] border border-[#e2e1dd] focus:bg-white focus:outline-none focus:border-[#28543e]"
-              />
+          {/* Available Voice Profiles Grid */}
+          <div>
+            <h2 className="text-base sm:text-lg font-bold text-[#1a1c1a] mb-3">Available Voice Profiles</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {voiceProfiles.map((profile) => (
+                <div
+                  key={profile.id}
+                  onClick={() => setSelectedVoice(profile.id)}
+                  className={`p-4 sm:p-5 rounded-2xl border transition cursor-pointer flex flex-col justify-between gap-3 ${
+                    selectedVoice === profile.id
+                      ? 'border-[#28543e] bg-[#eaf2ec]/30 shadow-xs'
+                      : 'border-[#eeece8] bg-white hover:border-[#28543e]/40'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-bold text-sm sm:text-base text-[#1a1c1a]">{profile.name}</h3>
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#f6f5f2] text-[#28543e]">
+                          {profile.tag}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#58605c] mt-1 leading-relaxed">{profile.description}</p>
+                    </div>
+
+                    {/* Preview Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePlayVoicePreview(profile);
+                      }}
+                      className="w-10 h-10 rounded-full bg-white border border-[#eeece8] hover:border-[#28543e] text-[#28543e] flex items-center justify-center shadow-xs shrink-0 hover:scale-105 transition"
+                      title="Preview this voice"
+                    >
+                      <span className="material-symbols-outlined text-xl">
+                        {playingVoiceId === profile.id ? 'stop' : 'play_arrow'}
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-[#717973] pt-2 border-t border-[#eeece8]/60">
+                    <span>{profile.languages}</span>
+                    <span className="font-semibold text-[#28543e]">
+                      {selectedVoice === profile.id ? '✓ Selected Voice' : 'Click to Select'}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       )}
 
-      {/* Tab: Speech Tuning */}
-      {activeTab === 'advanced' && (
-        <div className="bg-white rounded-2xl p-6 border border-[#eeece8] shadow-xs space-y-6">
-          <div className="space-y-1">
-            <h3 className="font-bold text-base text-[#1a1c1a]">Cadence &amp; Prosody Tuning</h3>
-            <p className="text-xs sm:text-sm text-[#58605c]">Fine-tune speaking rate and human-like pause intervals</p>
+      {/* Tab 2: Caller Persona & Identity */}
+      {activeTab === 'persona' && (
+        <div className="bg-white rounded-2xl border border-[#eeece8] p-5 sm:p-7 shadow-xs space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-[#1a1c1a]">Who should the assistant speak as?</h2>
+            <p className="text-xs sm:text-sm text-[#58605c] mt-0.5">
+              The assistant will introduce itself as you and converse naturally as a human caller.
+            </p>
           </div>
 
-          <div className="space-y-6 pt-2">
-            {/* Speed slider */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-sm font-semibold text-[#1a1c1a]">
+          <div className="space-y-4 max-w-xl">
+            <div>
+              <label className="block text-xs sm:text-sm font-semibold text-[#1a1c1a] mb-1.5" htmlFor="caller-name-input">
+                Your Display / Call Name
+              </label>
+              <input
+                id="caller-name-input"
+                type="text"
+                value={callerName}
+                onChange={(e) => setCallerName(e.target.value)}
+                placeholder="e.g. Ganesh, Sunil Kumar..."
+                className="w-full min-h-[44px] px-3.5 bg-[#f6f5f2] border-0 rounded-xl text-sm font-semibold text-[#1a1c1a] focus:bg-white focus:ring-2 focus:ring-[#28543e]/20 outline-none transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-semibold text-[#1a1c1a] mb-1.5">
+                Conversational Tone
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setConversationalTone('informal')}
+                  className={`min-h-[48px] p-3 rounded-xl border text-left text-xs sm:text-sm font-medium transition cursor-pointer ${
+                    conversationalTone === 'informal'
+                      ? 'border-[#28543e] bg-[#eaf2ec]/40 text-[#28543e] font-semibold'
+                      : 'border-[#eeece8] bg-[#f6f5f2] text-[#58605c]'
+                  }`}
+                >
+                  <div className="font-bold">⚡ Informal &amp; Casual (Recommended)</div>
+                  <div className="text-[11px] text-[#717973] mt-0.5">
+                    Speaks like a friend or customer: &ldquo;ಹೇ, ನಮಸ್ತೆ! ಸಣ್ಣ ವಿಷಯ ಕೇಳ್ಬೇಕಿತ್ತು...&rdquo;
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setConversationalTone('formal')}
+                  className={`min-h-[48px] p-3 rounded-xl border text-left text-xs sm:text-sm font-medium transition cursor-pointer ${
+                    conversationalTone === 'formal'
+                      ? 'border-[#28543e] bg-[#eaf2ec]/40 text-[#28543e] font-semibold'
+                      : 'border-[#eeece8] bg-[#f6f5f2] text-[#58605c]'
+                  }`}
+                >
+                  <div className="font-bold">Formal / Corporate</div>
+                  <div className="text-[11px] text-[#717973] mt-0.5">
+                    Polite, reserved tone: &ldquo;ನಮಸ್ಕಾರ, ನಾನು ಈ ವಿಷಯದ ಬಗ್ಗೆ ವಿಚಾರಿಸಲು ಕರೆ ಮಾಡಿದ್ದೇನೆ.&rdquo;
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hideAiIdentity}
+                  onChange={(e) => setHideAiIdentity(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded text-[#28543e] focus:ring-[#28543e] border-[#c1c9c1] accent-[#28543e]"
+                />
+                <span className="text-xs sm:text-sm text-[#58605c] leading-relaxed select-none">
+                  <strong className="text-[#1a1c1a] block">Never introduce as an AI or VaaniCall</strong>
+                  Strictly speak as {callerName || 'the caller'}, avoiding robotic words like &ldquo;I am an AI assistant&rdquo;.
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: Speech Tuning */}
+      {activeTab === 'tuning' && (
+        <div className="bg-white rounded-2xl border border-[#eeece8] p-5 sm:p-7 shadow-xs space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-[#1a1c1a]">Speech Rate &amp; Natural Pauses</h2>
+            <p className="text-xs sm:text-sm text-[#58605c] mt-0.5">
+              Tune pacing and audio flow for native Kannada delivery.
+            </p>
+          </div>
+
+          <div className="space-y-5 max-w-xl">
+            <div>
+              <div className="flex justify-between text-xs sm:text-sm font-semibold mb-2">
                 <span>Speaking Rate</span>
-                <span className="font-mono text-[#28543e]">{speakingSpeed.toFixed(1)}x</span>
+                <span className="text-[#28543e] font-mono">{speakingSpeed.toFixed(1)}x</span>
               </div>
               <input
                 type="range"
@@ -277,35 +582,10 @@ export default function VoiceStudioSettingsPage() {
                 onChange={(e) => setSpeakingSpeed(parseFloat(e.target.value))}
                 className="w-full accent-[#28543e] cursor-pointer"
               />
-              <div className="flex justify-between text-xs text-[#717973]">
+              <div className="flex justify-between text-[11px] text-[#717973] mt-1">
                 <span>0.8x (Deliberate)</span>
-                <span>1.0x (Standard)</span>
-                <span>1.3x (Brisk)</span>
-              </div>
-            </div>
-
-            {/* Natural Pause selection */}
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-[#1a1c1a]">Conversational Pause Interval</label>
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { id: 'short', label: 'Brief (300ms)' },
-                  { id: 'medium', label: 'Natural (500ms)' },
-                  { id: 'relaxed', label: 'Relaxed (800ms)' },
-                ].map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setNaturalPause(p.id)}
-                    className={`py-2 px-3 rounded-xl text-xs font-semibold border transition ${
-                      naturalPause === p.id
-                        ? 'border-[#28543e] bg-[#eaf2ec] text-[#28543e]'
-                        : 'border-[#eeece8] bg-white text-[#58605c] hover:bg-[#f6f5f2]'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
+                <span>1.0x (Natural)</span>
+                <span>1.3x (Fast)</span>
               </div>
             </div>
           </div>
