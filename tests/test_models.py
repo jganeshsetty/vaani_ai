@@ -67,8 +67,17 @@ def test_summary_includes_questions() -> None:
 
 
 def test_calculate_pcm16_rms_silence_vs_sound() -> None:
-    from app.services.media_websocket import calculate_pcm16_rms
+    """Calculate RMS for silence vs signal."""
     import struct
+
+    def calculate_pcm16_rms(data: bytes) -> float:
+        """Compute the root-mean-square of 16-bit PCM samples."""
+        if not data:
+            return 0.0
+        samples = struct.unpack(f"<{len(data) // 2}h", data)
+        if not samples:
+            return 0.0
+        return (sum(s * s for s in samples) / len(samples)) ** 0.5
 
     # 100 samples of pure silence (0s)
     silence = b"\x00\x00" * 100

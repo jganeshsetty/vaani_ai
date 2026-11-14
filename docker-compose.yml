@@ -13,5 +13,24 @@ services:
     volumes:
       - mongo_data:/data/db
 
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vaani-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - VAANI_MONGODB_URI=mongodb://localhost:27017
+      - VAANI_MONGODB_DB=vaani_ai
+      - VAANI_HOST=0.0.0.0
+      - VAANI_PORT=8000
+      - VAANI_CORS_ORIGINS=*
+    volumes:
+      - ./app:/app/app:ro
+    depends_on:
+      - mongo
+    restart: unless-stopped
+
 volumes:
   mongo_data:

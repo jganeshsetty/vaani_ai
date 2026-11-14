@@ -38,32 +38,9 @@ async def get_task(task_id: str) -> TaskOut:
     return task
 
 
-@router.post("/calls/start", response_model=CallOut, status_code=201)
-async def start_call(payload: CallStartRequest) -> CallOut:
-    """Create a call record and trigger Exotel in a background task."""
-    from app.services.exotel_service import trigger_exotel_call
-
-    task = await task_service.get_task(payload.task_id)
-    if task is None:
-        raise HTTPException(status_code=404, detail="Task not found")
-
-    language = payload.language or task.language
-    target = payload.target_number or task.target_number
-
-    call = await call_service.create_call(task.id, language=language, target_number=target)
-    await task_service.update_task_status(task.id, TaskStatus.CALLING)
-
-    # Trigger Exotel single-leg outbound call
-    try:
-        await trigger_exotel_call(call.id, task, target_number=target, language=language)
-        fresh = await call_service.get_call(call.id)
-        return fresh or call
-    except Exception as exc:  # pragma: no cover
-        err_msg = str(exc)
-        logger.warning("Exotel trigger failed for call %s: %s", call.id, err_msg)
-        await call_service.set_call_failed(call.id, err_msg)
-        fresh = await call_service.get_call(call.id)
-        return fresh or call
+# Note: Legacy /api/calls/start endpoint removed.
+# Use POST /api/create-outbound-call in call_sessions.py instead.
+# This endpoint created tasks and triggered Exotel calls, which is no longer used.
 
 
 @router.get("/calls/{call_id}", response_model=CallOut)

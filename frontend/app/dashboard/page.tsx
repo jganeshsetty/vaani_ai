@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createTask, startCall } from '@/app/api/client';
+import { createSession } from '@/app/api/client';
 
 export default function NewCallDashboard() {
   const router = useRouter();
@@ -133,41 +133,28 @@ export default function NewCallDashboard() {
         : `[CALLER_PERSONA: Speak politely as ${callerName}.] ${instructions}`;
 
     try {
-      // 1. Create task in FastAPI backend
-      const task = await createTask({
-        user_id: callerName.toLowerCase().replace(/\s+/g, '_'),
-        description: personaInstruction,
+      // 1. Create call session with new CallSession API
+      const session = await createSession({
+        mode: 'outbound',
+        target_number: fullNumber,
+        target_name: 'Recipient',
+        context_prompt: personaInstruction,
         language: languageMode === 'auto' ? 'kannada' : languageMode,
-        target_number: fullNumber,
-        constraints: [
-          callerTone === 'informal'
-            ? 'speak casually without robotic words, never mention AI'
-            : 'be polite and clear in Kannada/English',
-        ],
-        questions_to_ask: [instructions],
       });
 
-      // 2. Start call
-      const call = await startCall({
-        task_id: task.id,
-        target_number: fullNumber,
-        language: task.language,
-      });
-
-      if (call.status === 'failed') {
-        const errorReason = call.summary || 'Exotel telecom failed to initiate the call.';
-        setError(errorReason);
+      if (!session.id) {
+        setError('Failed to create call session');
         return;
       }
 
-      // 3. Navigate to live call screen with full context
+      // 2. Navigate to mobile call interface with room_id
       router.push(
-        `/dashboard/live?call_id=${call.id}&caller=${encodeURIComponent(callerName)}&phone=${encodeURIComponent(
+        `/call/${session.id}?caller=${encodeURIComponent(callerName)}&phone=${encodeURIComponent(
           fullNumber
         )}&desc=${encodeURIComponent(instructions)}`
       );
     } catch (err: any) {
-      console.warn('Backend call trigger failed or fallback:', err);
+      console.warn('Backend call trigger failed:', err);
       const errMsg = err?.message || 'Failed to connect to backend server.';
       setError(errMsg);
     } finally {
@@ -310,6 +297,12 @@ export default function NewCallDashboard() {
                 <span>Use Verified Number (8660039103)</span>
               </button>
             </div>
+            <div className="text-[11px] text-[#464555] mt-1.5 flex items-center gap-1">
+              <span className="material-symbols-outlined text-[14px] text-amber-600">info</span>
+              <span>
+                <strong>Call Source:</strong> Your calls are handled through the secure backend call sessions system.
+              </span>
+            </div>
             <div className="flex flex-col sm:flex-row gap-2.5">
               <div className="relative w-full sm:w-36 flex-shrink-0">
                 <select
@@ -342,7 +335,7 @@ export default function NewCallDashboard() {
             <p className="text-[11px] text-[#464555] mt-1.5 flex items-center gap-1">
               <span className="material-symbols-outlined text-[14px] text-amber-600">info</span>
               <span>
-                <strong>Exotel Trial Limitation:</strong> Calls are routed via Exotel trial line (08047290621). Under telecom KYC rules, trial accounts only dial numbers verified in your Exotel dashboard.
+                <strong>Secure Connection:</strong> A WhatsApp Magic Link will be sent to this number for you to join the voice call session securely.
               </span>
             </p>
           </div>

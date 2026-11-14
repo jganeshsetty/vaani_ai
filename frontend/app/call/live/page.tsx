@@ -110,7 +110,7 @@ function LiveCallContent() {
       }
     }
     setTimeout(() => {
-      router.push(callId ? `/call/${callId}` : '/call/history');
+      router.push(callId ? `/call/details?id=${callId}` : '/call/history');
     }, 400);
   };
 
@@ -135,7 +135,7 @@ function LiveCallContent() {
               <span>Why did this happen?</span>
             </p>
             <p className="text-slate-600 leading-relaxed">
-              Exotel trial accounts operate under Department of Telecom KYC restrictions and can only dial numbers verified in your Exotel dashboard (such as your registered number <strong>+91 8660039103</strong>).
+              Call sessions are set up through the secure backend session system. If this message appears, the session may still be initializing, or the telecom provider rejected the connection request. Check that the session was created via the dashboard.
             </p>
           </div>
 
@@ -150,7 +150,7 @@ function LiveCallContent() {
             </button>
             <button
               type="button"
-              onClick={() => router.push(callId ? `/call/${callId}` : '/call/history')}
+              onClick={() => router.push(callId ? `/call/details?id=${callId}` : '/call/history')}
               className="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition cursor-pointer"
             >
               View Record

@@ -18,15 +18,19 @@ services:
         sync: false
       - key: VAANI_MONGODB_DB
         value: vaani_ai
-      - key: VAANI_EXOTEL_API_KEY
-        sync: false
-      - key: VAANI_EXOTEL_TOKEN
-        sync: false
-      - key: VAANI_EXOTEL_BASE_URL
-        value: https://api.exotel.com/v1
-      - key: VAANI_EXOTEL_VOICE_AI_SID
+      - key: VAANI_HUGGINGFACE_API_KEY
         sync: false
       - key: VAANI_GNANI_API_KEY
+        sync: false
+      - key: VAANI_WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: VAANI_WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: VAANI_GCP_PROJECT_ID
+        sync: false
+      - key: VAANI_GCS_BUCKET_NAME
+        sync: false
+      - key: VAANI_GOOGLE_APPLICATION_CREDENTIALS
         sync: false
 
   # 2. Next.js Frontend Service
@@ -40,4 +44,3 @@ services:
     envVars:
       - key: NEXT_PUBLIC_API_URL
         sync: false
-

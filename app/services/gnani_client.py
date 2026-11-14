@@ -1,8 +1,9 @@
-"""Client for Gnani.ai Vachana platform: Timbre (TTS) and Prisma (STT).
+"""Client for Gnani.ai Speech APIs: Prisma (STT) and Timbre (TTS).
 
-Uses the official Gnani Vachana AI endpoints with X-API-Key-ID authentication.
-TTS: https://api.vachana.ai/api/v1/tts/inference
 STT: https://api.vachana.ai/stt/v3
+TTS: https://api.vachana.ai/api/v1/tts/inference
+
+Authentication uses the X-API-Key-ID header with the unified Gnani API key.
 """
 from __future__ import annotations
 
@@ -59,7 +60,6 @@ class GnaniTTSClient:
     async def synthesize(self, text: str) -> AsyncIterator[bytes]:
         """Stream synthesized audio chunks for media WebSocket streaming."""
         audio_wav = await self.synthesize_wav(text)
-        # Yield in 320-byte chunks (standard 20ms at 8kHz PCM)
         chunk_size = 320
         for i in range(0, len(audio_wav), chunk_size):
             yield audio_wav[i : i + chunk_size]
@@ -84,7 +84,7 @@ class GnaniTTSClient:
         }
         payload = {
             "text": norm_text,
-            "model": "timbre-v2.5",
+            "model": "timbre-v3.0",
             "voice": self.voice,
             "language": lang_code,
             "audio_config": {

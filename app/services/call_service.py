@@ -1,4 +1,8 @@
-"""Call lifecycle service: creation, transcript accumulation, verification."""
+"""Legacy call lifecycle service (kept for backwards compatibility).
+
+Newer dual-mode sessions live in call_session_service.py; this module
+continues to support the legacy /api/tasks + /api/calls flow.
+"""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -50,7 +54,6 @@ async def create_call(task_id: str, language: Optional[Language] = None, target_
 
 async def get_call(call_id: str) -> Optional[CallOut]:
     from bson import ObjectId
-
     col: AsyncIOMotorCollection = calls_collection()
     try:
         doc = await col.find_one({"_id": ObjectId(call_id)})
@@ -76,7 +79,6 @@ async def get_latest_active_call() -> Optional[CallOut]:
         sort=[("created_at", -1)],
     )
     if doc is None:
-        # Fall back to the most recent call
         doc = await col.find_one({}, sort=[("created_at", -1)])
     if doc is None:
         return None
@@ -85,7 +87,6 @@ async def get_latest_active_call() -> Optional[CallOut]:
 
 async def set_call_exotel(call_id: str, call_sid: str, media_sid: str) -> None:
     from bson import ObjectId
-
     col: AsyncIOMotorCollection = calls_collection()
     await col.update_one(
         {"_id": ObjectId(call_id)},
@@ -102,7 +103,6 @@ async def set_call_exotel(call_id: str, call_sid: str, media_sid: str) -> None:
 
 async def append_transcript(call_id: str, entry: dict) -> None:
     from bson import ObjectId
-
     col: AsyncIOMotorCollection = calls_collection()
     await col.update_one(
         {"_id": ObjectId(call_id)},
@@ -112,7 +112,6 @@ async def append_transcript(call_id: str, entry: dict) -> None:
 
 async def set_verification(call_id: str, question: str, status: ConfirmationStatus) -> None:
     from bson import ObjectId
-
     col: AsyncIOMotorCollection = calls_collection()
     await col.update_one(
         {"_id": ObjectId(call_id)},
@@ -122,7 +121,6 @@ async def set_verification(call_id: str, question: str, status: ConfirmationStat
 
 async def set_call_summary(call_id: str, summary: str) -> None:
     from bson import ObjectId
-
     col: AsyncIOMotorCollection = calls_collection()
     await col.update_one(
         {"_id": ObjectId(call_id)},
@@ -132,7 +130,6 @@ async def set_call_summary(call_id: str, summary: str) -> None:
 
 async def set_call_failed(call_id: str, error: str) -> None:
     from bson import ObjectId
-
     col: AsyncIOMotorCollection = calls_collection()
     await col.update_one(
         {"_id": ObjectId(call_id)},

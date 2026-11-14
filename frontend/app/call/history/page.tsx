@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { fetchCalls, fetchTasks, Call, Task } from '@/app/api/client';
+import { listSessions, CallSession } from '@/app/api/client';
 
 interface HistoryItem {
   id: string;
@@ -12,7 +12,7 @@ interface HistoryItem {
   date: string;
   duration: string;
   language: string;
-  status: 'completed' | 'attention' | 'missed';
+  status: 'completed' | 'attention' | 'missed' | 'pending' | 'in_progress' | 'failed';
   summary: string;
 }
 
@@ -27,11 +27,11 @@ export default function CallHistoryPage() {
     (async () => {
       try {
         setLoading(true);
-        const calls = await fetchCalls();
-        if (calls && calls.length > 0) {
-          const apiItems: HistoryItem[] = calls.map((c) => {
-            const formattedDate = c.created_at
-              ? new Date(c.created_at).toLocaleDateString('en-US', {
+        const sessions = await listSessions();
+        if (sessions && sessions.length > 0) {
+          const apiItems: HistoryItem[] = sessions.map((s) => {
+            const formattedDate = s.created_at
+              ? new Date(s.created_at).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
                   hour: '2-digit',
@@ -40,14 +40,14 @@ export default function CallHistoryPage() {
               : 'Recent';
 
             return {
-              id: c.id,
-              name: c.target_number ? `Call to ${c.target_number}` : `Call #${c.id.slice(-6)}`,
-              number: c.target_number || (c.exotel_call_sid ? `SID: ${c.exotel_call_sid.slice(0, 10)}...` : 'Telephony Line'),
+              id: s.id,
+              name: s.target_name ? `Call to ${s.target_name}` : `Session #${s.id.slice(-6)}`,
+              number: s.target_number || 'Telephony Line',
               date: formattedDate,
               duration: '1m 15s',
-              language: c.language_detected === 'kannada' ? 'ಕನ್ನಡ' : c.language_detected || 'ಕನ್ನಡ',
-              status: c.status === 'completed' ? 'completed' : c.status === 'failed' ? 'missed' : 'attention',
-              summary: c.summary || 'Call successfully completed by VaaniCall AI.',
+              language: s.language === 'kannada' ? 'ಕನ್ನಡ' : s.language || 'ಕನ್ನಡ',
+              status: s.status === 'completed' ? 'completed' : s.status === 'failed' ? 'missed' : s.status === 'in_progress' ? 'attention' : 'pending',
+              summary: s.summary || 'Call session completed.',
             };
           });
           setItems(apiItems);
@@ -144,7 +144,7 @@ export default function CallHistoryPage() {
           filteredItems.map((item) => (
             <div
               key={item.id}
-              onClick={() => router.push(`/call/${item.id}`)}
+              onClick={() => router.push(`/call/details?id=${item.id}`)}
               className="bg-white rounded-2xl p-5 border border-[#e2e7ff] hover:border-primary-container shadow-xl shadow-slate-900/5 hover:shadow-2xl transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group"
             >
               <div className="flex items-start gap-3.5 min-w-0">

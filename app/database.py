@@ -1,6 +1,7 @@
 """MongoDB async connection via Motor with resilient In-Memory fallback for cloud deployment."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import uuid
@@ -29,7 +30,7 @@ class InMemoryCursor:
         self._docs = docs
         self._index = 0
 
-    def sort(self, key_or_list: Any, direction: int = 1) -> InMemoryCursor:
+    def sort(self, key_or_list: Any, direction: int = 1) -> "InMemoryCursor":
         if isinstance(key_or_list, list):
             key, direction = key_or_list[0]
         else:
@@ -88,7 +89,7 @@ class InMemoryCollection:
         if not matching:
             return None
         if sort:
-            cursor = InMemoryCursor(matching).sort(sort[0][0] if isinstance(sort, list) else sort, 
+            cursor = InMemoryCursor(matching).sort(sort[0][0] if isinstance(sort, list) else sort,
                                                    sort[0][1] if isinstance(sort, list) else 1)
             matching = cursor._docs
         return deepcopy(matching[0])
@@ -151,10 +152,12 @@ async def connect_to_mongo() -> None:
         _client = AsyncIOMotorClient(
             settings.mongodb_uri,
             serverSelectionTimeoutMS=2000,
+            connectTimeoutMS=2000,
+            socketTimeoutMS=2000,
         )
         _db = _client[settings.mongodb_db]
-        # Verify connectivity
-        await _client.admin.command("ping")
+        # Verify connectivity with strict timeout
+        await asyncio.wait_for(_client.admin.command("ping"), timeout=2.0)
         _is_mock = False
         logger.info("Connected to MongoDB at %s (%s)", settings.mongodb_uri, settings.mongodb_db)
     except Exception as exc:
@@ -195,6 +198,11 @@ def tasks_collection() -> Any:
 
 def calls_collection() -> Any:
     return get_database()["calls"]
+
+
+def call_sessions_collection() -> Any:
+    """Collection for dual-mode CallSession documents (room_id, mode, etc.)."""
+    return get_database()["call_sessions"]
 
 
 def transcripts_collection() -> Any:
