@@ -130,8 +130,10 @@ class EvonClient:
         temperature: float = 0.3,
     ) -> str:
         """Generate a concise call summary from a transcript using Evon."""
+        if not transcript:
+            return "Call ended with no spoken conversation."
         transcript_text = "\n".join(
-            f"{entry.get('role', 'unknown')}: {entry.get('text', '')}"
+            f"{entry.get('speaker', entry.get('role', 'unknown'))}: {entry.get('text', '')}"
             for entry in transcript
         )
         messages = [
@@ -139,8 +141,8 @@ class EvonClient:
                 "role": "system",
                 "content": (
                     "You are a concise call-summarization assistant. "
-                    "Produce a 3-5 bullet executive summary of the conversation "
-                    "including key outcomes, decisions, and any action items."
+                    "Produce a crisp 2-4 sentence executive summary of the conversation "
+                    "capturing what was discussed, what was agreed upon, and overall outcome."
                 ),
             },
             {
@@ -149,6 +151,55 @@ class EvonClient:
             },
         ]
         return await self.chat_once(messages, max_tokens=max_tokens, temperature=temperature)
+
+    async def extract_action_items(
+        self,
+        transcript: list[dict],
+        *,
+        max_tokens: int = 512,
+        temperature: float = 0.2,
+    ) -> list[str]:
+        """Extract concrete actionable tasks and follow-ups from the call transcript."""
+        if not transcript:
+            return ["No follow-up action items required."]
+        transcript_text = "\n".join(
+            f"{entry.get('speaker', entry.get('role', 'unknown'))}: {entry.get('text', '')}"
+            for entry in transcript
+        )
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "Extract actionable next steps and follow-ups from the call transcript as a JSON list of short strings. "
+                    "Example output format: [\"Send project documentation to Ganesh\", \"Follow up tomorrow regarding schedule\"]. "
+                    "Respond with ONLY the valid JSON array."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"Extract action items from this transcript:\n\n{transcript_text}",
+            },
+        ]
+        raw = await self.chat_once(messages, max_tokens=max_tokens, temperature=temperature)
+        try:
+            # Clean markdown code blocks if any
+            clean_raw = raw.strip()
+            if clean_raw.startswith("```"):
+                clean_raw = clean_raw.split("\n", 1)[1]
+                clean_raw = clean_raw.rsplit("```", 1)[0].strip()
+            parsed = json.loads(clean_raw)
+            if isinstance(parsed, list):
+                return [str(item) for item in parsed if item]
+        except Exception:
+            pass
+
+        # Fallback extraction: lines with bullets
+        items = []
+        for line in raw.split("\n"):
+            line = line.strip().lstrip("-*•0123456789. ")
+            if line and len(line) > 5:
+                items.append(line)
+        return items if items else ["Follow up on discussed topics with the caller."]
 
 
 def evon_client() -> EvonClient:

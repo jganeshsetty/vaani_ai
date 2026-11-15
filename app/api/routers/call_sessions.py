@@ -1,11 +1,13 @@
-"""Call Session API Router for dual-mode web-based calling system.
+"""Call Session API Router for streamlined VaaniCall AI architecture.
 
-Endpoints:
-  - POST /api/outbound - Create outbound session
-  - POST /api/generate-busy-session - Generate inbound session (busy mode)
-  - GET /api/sessions - List all sessions
-  - GET /api/sessions/room/{room_id} - Fetch session by room_id
-  - WebSocket /ws/call/{room_id} - Real-time STT -> Evon -> TTS streaming
+Core Endpoints:
+  - POST /api/initiate - Initiate dynamic outbound call session (stores in MongoDB, returns shareable URL)
+  - GET /api/setup - Fetch user setup profile and permanent link configuration
+  - POST /api/setup - Save user setup profile (instructions, persona, voice cloning) and generate permanent link
+  - GET /api/sessions/room/{room_id} - Fetch call session by UUID/room_id (auto-provisions if missing)
+  - GET /api/summary/{room_id} - Fetch call summary, action items, and complete transcript
+  - POST /api/calls/{room_id}/end - End call and trigger AI summary + action items extraction
+  - WebSocket /ws/call/{room_id} & /ws/{room_id} - Real-time two-way voice streaming (Gnani STT -> Evon v3.3 -> Gnani TTS)
 """
 from __future__ import annotations
 
@@ -13,21 +15,24 @@ import asyncio
 import logging
 import json
 import uuid
+import re
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from app.models import CallMode, CallStatus, Language, SpeakerIdRequest
+from app.models import CallMode, CallStatus, Language
 from app.services.call_session_service import (
     create_session,
     get_session_by_room,
     append_transcript,
     set_session_status,
     set_call_summary,
-    set_scheduled_time,
+    list_sessions,
+    get_user_profile,
+    save_user_profile,
 )
 from app.services.gnani_client import GnaniSTTClient, GnaniTTSClient
 from app.services.evon_client import evon_client
@@ -37,58 +42,44 @@ logger = logging.getLogger("vaani.callsessions")
 router = APIRouter(prefix="/api", tags=["call-sessions"])
 
 
-# --- Request / Response Models ---
+# --- Pydantic Schemas ---
 
-class CreateOutboundRequest(BaseModel):
-    """Request body for creating an outbound call session."""
-
-    target_name: Optional[str] = Field(default="Recipient", description="Target person's name for context")
-    target_number: str = Field(..., description="Target phone number in E.164 format")
-    context_prompt: str = Field(..., min_length=1, max_length=2000, description="The prompt/instructions for the AI agent")
-    language: Optional[Language] = Field(default=Language.ENGLISH, description="Conversation language")
-    schedule_time: Optional[str] = Field(None, description="ISO string timestamp when session should start (null = immediate)")
-    speaker_id: Optional[str] = None
-
-
-class CreateOutboundResponse(BaseModel):
-    """Response after creating an outbound call session."""
-
-    room_id: str
-    mode: str
-    status: str
+class InitiateCallRequest(BaseModel):
+    """Payload to initiate a new dynamic call session."""
+    target_number: str = Field(..., description="Target phone number (e.g. +91 8660039103)")
+    recipient_name: Optional[str] = Field("Recipient", description="Name of the person being called")
+    caller_name: Optional[str] = Field("Ganesh", description="Your name / caller identity")
+    context_prompt: str = Field(..., min_length=1, max_length=3000, description="Exact context/message to convey")
+    voice_tone: Optional[str] = Field("natural", description="Conversation tone: natural, professional, urgent, friendly")
+    speaker_id: Optional[str] = Field(None, description="Gnani voice cloning profile ID if available")
+    language: Optional[Language] = Field(Language.ENGLISH, description="Language for call")
+    schedule_time: Optional[str] = Field(None, description="Optional ISO timestamp for scheduled calling")
 
 
-class BusySessionResponse(BaseModel):
-    """Response for busy mode session generation."""
-
-    room_id: str
-    mode: str
-    status: str
-
-
-class SendMessageRequest(BaseModel):
-    """Request payload for dispatching call link message."""
-
-    phone: str
-    recipient_name: Optional[str] = "Ganesh"
-    caller: Optional[str] = "Ganesh"
-    instructions: Optional[str] = "Both Feature 1 and Feature 2 are working perfectly"
-    link: Optional[str] = None
-    message: Optional[str] = None
+class SetupProfileRequest(BaseModel):
+    """Payload to configure one-time user profile & permanent auto-responder."""
+    user_name: str = Field(..., min_length=1, max_length=100, description="Your primary user name")
+    persona: Optional[str] = Field("Personal autonomous voice assistant", description="Role/persona description")
+    base_instructions: str = Field(..., min_length=1, max_length=3000, description="Base system instructions for the AI")
+    voice_id: Optional[str] = Field("Aarohi", description="Standard voice name or cloned profile")
+    speaker_id: Optional[str] = Field(None, description="Voice cloning ID from Gnani Timbre")
+    phone: Optional[str] = Field(None, description="Your primary phone number")
 
 
 class SessionResponse(BaseModel):
-    """Call session response model."""
-
+    """Full session response representation."""
     id: str
     room_id: str
     mode: str
-    target_number: str | None
-    target_name: str | None
+    target_number: Optional[str] = None
+    target_name: Optional[str] = None
+    caller_name: Optional[str] = "Ganesh"
     context_prompt: str
+    voice_tone: Optional[str] = "natural"
     status: str
     transcript: list[dict]
-    summary: str | None
+    summary: Optional[str] = None
+    action_items: list[str] = []
     scheduled_time: Optional[str] = None
     language: str
     created_at: str
@@ -96,192 +87,350 @@ class SessionResponse(BaseModel):
     speaker_id: Optional[str] = None
 
 
-# --- Default Busy Mode Prompt ---
-DEFAULT_BUSY_MODE_PROMPT = "You are Ganesh's AI assistant. He is busy right now. Greet the caller, ask for their name, and take a message."
+class SummaryResponse(BaseModel):
+    """Structured post-call summary and action items."""
+    room_id: str
+    status: str
+    caller_name: str
+    recipient_name: str
+    summary: str
+    action_items: list[str]
+    transcript: list[dict]
+    duration_seconds: int = 0
+    created_at: str
+    updated_at: str
 
 
-# --- Outbound Call Creation Endpoint ---
+# --- Core Page 1: Initiation Endpoint ---
 
-@router.post("/outbound", response_model=CreateOutboundResponse, status_code=201)
-async def create_outbound_session(request: CreateOutboundRequest):
-    """Create a new outbound call session."""
-    # Normalize and validate phone number format
-    norm_phone = request.target_number.strip()
-    if not norm_phone.startswith("+"):
-        norm_phone = f"+{norm_phone}"
-
-    # Parse schedule_time if provided
-    scheduled_time = None
-    if request.schedule_time:
-        try:
-            scheduled_time = datetime.fromisoformat(request.schedule_time.replace("Z", "+00:00"))
-            if scheduled_time < datetime.now(timezone.utc):
-                raise HTTPException(status_code=400, detail="schedule_time must be in the future")
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid schedule_time format: {e}")
-
-    # Create session in MongoDB
-    session = await create_session(
-        mode=CallMode.OUTBOUND,
-        target_number=norm_phone,
-        context_prompt=request.context_prompt,
-        language=request.language,
-        target_name=request.target_name,
-        scheduled_time=scheduled_time,
-        speaker_id=request.speaker_id,
-    )
-
-    return CreateOutboundResponse(
-        room_id=session.room_id,
-        mode=session.mode,
-        status=session.status,
-    )
-
-
-# --- Call Message Dispatch Pipeline Endpoint ---
-
-@router.post("/messages/send", status_code=200)
-async def send_call_message(payload: SendMessageRequest):
+@router.post("/initiate", status_code=201)
+@router.post("/outbound", status_code=201)
+async def initiate_call_session(req: InitiateCallRequest):
     """
-    Backend pipeline endpoint for Feature 2:
-    - Normalizes recipient phone number
-    - Generates dynamic call session link
-    - Formats outgoing message
-    - Auto-provisions the call session in MongoDB for immediate connection
+    Page 1 Initiation Endpoint:
+    - Generates a cryptographically strong UUID session ID.
+    - Normalizes phone number.
+    - Persists session details in MongoDB Atlas.
+    - Returns shareable link: /call/[session-uuid]
     """
-    import re
-    clean_phone = payload.phone.strip()
+    clean_phone = req.target_number.strip()
     if not clean_phone.startswith("+"):
         clean_phone = f"+{clean_phone}"
 
-    extracted_room = None
-    link = payload.link
-    if link:
-        m = re.search(r'/call/([a-zA-Z0-9_\-]+)', link)
-        if m:
-            extracted_room = m.group(1)
+    session_uuid = str(uuid.uuid4())
 
-    room_id = extracted_room or str(uuid.uuid4())
+    scheduled_time = None
+    if req.schedule_time:
+        try:
+            scheduled_time = datetime.fromisoformat(req.schedule_time.replace("Z", "+00:00"))
+        except Exception:
+            pass
 
-    existing_session = await get_session_by_room(room_id)
-    if existing_session is None:
-        session = await create_session(
-            mode=CallMode.OUTBOUND,
-            target_number=clean_phone,
-            context_prompt=f"[CALLER_PERSONA: Speak informally as {payload.caller}.] {payload.instructions or 'Call setup'}",
-            language=Language.ENGLISH,
-            target_name=payload.recipient_name or "Ganesh",
-            room_id=room_id,
-        )
-    else:
-        session = existing_session
-
-    if not link:
-        link = f"http://localhost:3000/call/{room_id}?caller={payload.caller}&phone={clean_phone}&desc={payload.instructions or 'Call setup'}"
-
-    formatted_msg = payload.message or (
-        f"Hello {payload.recipient_name or 'there'}! This is {payload.caller}. "
-        f"Please join our secure voice call through this link:\n\n👉 {link}\n\n(No app download required • Opens directly in mobile browser)"
+    session = await create_session(
+        mode=CallMode.OUTBOUND,
+        target_number=clean_phone,
+        target_name=req.recipient_name or "Recipient",
+        caller_name=req.caller_name or "Ganesh",
+        context_prompt=req.context_prompt,
+        voice_tone=req.voice_tone or "natural",
+        language=req.language or Language.ENGLISH,
+        scheduled_time=scheduled_time,
+        speaker_id=req.speaker_id,
+        room_id=session_uuid,
     )
+
+    shareable_path = f"/call/{session_uuid}"
 
     return {
         "status": "success",
-        "phone": clean_phone,
-        "recipient_name": payload.recipient_name,
-        "caller": payload.caller,
-        "link": link,
-        "room_id": room_id,
-        "message": formatted_msg,
+        "session_uuid": session_uuid,
+        "room_id": session_uuid,
+        "link": shareable_path,
+        "full_url": f"http://localhost:3000{shareable_path}",
+        "target_number": clean_phone,
+        "recipient_name": session.target_name,
+        "caller_name": session.caller_name,
+        "context_prompt": session.context_prompt,
+        "voice_tone": session.voice_tone,
+        "formatted_sms": (
+            f"Hello {session.target_name}! This is {session.caller_name}. "
+            f"Please join our secure voice call here:\n\n👉 http://localhost:3000{shareable_path}\n\n"
+            f"(No app required • Opens directly in mobile browser)"
+        ),
+    }
+
+
+# Backwards compatibility for messaging endpoint
+@router.post("/messages/send", status_code=200)
+async def send_message_compat(data: dict):
+    phone = data.get("phone", "+918660039103")
+    recipient = data.get("recipient_name", "Recipient")
+    caller = data.get("caller", "Ganesh")
+    instructions = data.get("instructions", "Call setup")
+
+    req = InitiateCallRequest(
+        target_number=phone,
+        recipient_name=recipient,
+        caller_name=caller,
+        context_prompt=instructions,
+    )
+    res = await initiate_call_session(req)
+    return {
+        "status": "success",
+        "phone": res["target_number"],
+        "recipient_name": res["recipient_name"],
+        "caller": res["caller_name"],
+        "link": res["link"],
+        "room_id": res["room_id"],
+        "message": res["formatted_sms"],
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
-# --- Busy Mode Session Generation Endpoint ---
+# --- Core Page 2: One-Time Setup Endpoints ---
 
-@router.post("/generate-busy-session", response_model=BusySessionResponse, status_code=201)
-async def generate_busy_session():
-    """Generate a busy mode session (inbound) with default prompt."""
+@router.get("/setup")
+async def get_setup_configuration(user_id: str = "default_user"):
+    """Fetch current one-time user profile & permanent auto-responder configuration."""
+    profile = await get_user_profile(user_id)
+    permanent_room_id = profile.get("permanent_room_id", "p-ganesh")
+    permanent_link = f"/call/{permanent_room_id}"
+    user_name = profile.get("user_name", "Ganesh")
+
+    return {
+        "status": "success",
+        "profile": profile,
+        "permanent_room_id": permanent_room_id,
+        "permanent_link": permanent_link,
+        "auto_responder_template": (
+            f"Hi! I'm currently unavailable to take calls. "
+            f"Please speak with my personal voice assistant here:\n\n👉 http://localhost:3000{permanent_link}\n\n"
+            f"It will capture your message and notify me immediately."
+        ),
+    }
+
+
+@router.post("/setup")
+async def save_setup_configuration(req: SetupProfileRequest, user_id: str = "default_user"):
+    """
+    Save one-time profile, base agent instructions, voice preference,
+    and generate permanent auto-responder link.
+    """
+    profile = await save_user_profile(req.model_dump(), user_id=user_id)
+    permanent_room_id = profile.get("permanent_room_id")
+    permanent_link = f"/call/{permanent_room_id}"
+
+    return {
+        "status": "success",
+        "message": "One-time profile saved successfully",
+        "profile": profile,
+        "permanent_room_id": permanent_room_id,
+        "permanent_link": permanent_link,
+        "auto_responder_template": (
+            f"Hi! I'm currently unavailable to take calls. "
+            f"Please speak with my personal voice assistant here:\n\n👉 http://localhost:3000{permanent_link}\n\n"
+            f"It will capture your message and notify me immediately."
+        ),
+    }
+
+
+# --- Core Page 3 & 4: Session & Summary Endpoints ---
+
+@router.post("/sessions/spawn-permanent/{room_id}")
+async def spawn_permanent_session(room_id: str):
+    """
+    When an opposite caller taps the permanent auto-responder link (e.g. /call/p-ganesh),
+    dynamically generate a fresh temporary session UUID so this incoming caller gets their own
+    dedicated call session, transcript, and summary.
+    """
+    clean_id = room_id.replace("p-", "")
+    profile = await get_user_profile("default_user")
+    user_name = profile.get("user_name", clean_id.capitalize())
+    instructions = profile.get("base_instructions") or f"Greet the caller on behalf of {user_name}, ask who is calling and why, and take their message."
+
+    fresh_uuid = str(uuid.uuid4())
     session = await create_session(
         mode=CallMode.INBOUND,
         target_number=None,
-        context_prompt=DEFAULT_BUSY_MODE_PROMPT,
-        language=Language.KANNADA,
-        target_name=None,
-        scheduled_time=None,
+        target_name="Incoming Caller",
+        caller_name=user_name,
+        context_prompt=f"[PERMANENT AUTO-RESPONDER FOR {user_name.upper()}]: {instructions}",
+        language=Language.ENGLISH,
+        speaker_id=profile.get("speaker_id"),
+        room_id=fresh_uuid,
     )
 
-    return BusySessionResponse(
-        room_id=session.room_id,
-        mode=session.mode,
-        status=session.status,
-    )
+    return {
+        "status": "success",
+        "room_id": fresh_uuid,
+        "permanent_id": room_id,
+        "caller_name": user_name,
+        "recipient_name": "Incoming Caller",
+        "context_prompt": session.context_prompt,
+    }
 
 
-# --- Session Management Endpoints ---
+@router.get("/sessions/recent")
+async def get_recent_call_summaries(limit: int = 20):
+    """List recent call sessions with summary and transcript count for viewing on website."""
+    all_sessions = await list_sessions()
+    recent = []
+    for s in all_sessions[:limit]:
+        recent.append({
+            "id": s.id,
+            "room_id": s.room_id,
+            "mode": s.mode.value,
+            "caller_name": getattr(s, "caller_name", "Ganesh"),
+            "target_name": s.target_name or "Participant",
+            "target_number": s.target_number,
+            "status": s.status.value,
+            "summary": s.summary,
+            "action_items": getattr(s, "action_items", []),
+            "turns_count": len(s.transcript or []),
+            "created_at": s.created_at.isoformat(),
+        })
+    return {"status": "success", "sessions": recent}
+
 
 @router.get("/sessions/room/{room_id}", response_model=SessionResponse)
 @router.get("/call-sessions/room/{room_id}", response_model=SessionResponse)
 async def get_session_by_room_id(room_id: str):
-    """Fetch a call session by its room_id (UUID), auto-provisioning if dynamically created."""
+    """
+    Fetch session details by UUID room_id.
+    Auto-provisions gracefully if opened on-the-fly.
+    """
     session = await get_session_by_room(room_id)
     if session is None:
+        # Check if this is a permanent profile room
+        is_permanent = room_id.startswith("p-")
+        target_name = room_id.replace("p-", "").capitalize() if is_permanent else "Recipient"
+        caller_name = room_id.replace("p-", "").capitalize() if is_permanent else "Ganesh"
+
         session = await create_session(
-            mode=CallMode.OUTBOUND,
+            mode=CallMode.INBOUND if is_permanent else CallMode.OUTBOUND,
             target_number=None,
-            context_prompt="You are Ganesh's conversational voice assistant. Greet the recipient warmly and converse naturally in English.",
+            target_name=target_name,
+            caller_name=caller_name,
+            context_prompt=(
+                f"You are {caller_name}'s personal voice AI assistant. "
+                f"Greet the caller warmly in English, ask for their name, understand their request, "
+                f"and provide helpful answers. Speak in a natural, polite conversational tone."
+            ),
             language=Language.ENGLISH,
-            target_name="Recipient",
             room_id=room_id,
         )
+
     return SessionResponse(
         id=session.id,
         room_id=session.room_id,
-        mode=session.mode,
+        mode=session.mode.value,
         target_number=session.target_number,
         target_name=session.target_name,
+        caller_name=getattr(session, "caller_name", "Ganesh"),
         context_prompt=session.context_prompt,
-        status=session.status,
+        voice_tone=getattr(session, "voice_tone", "natural"),
+        status=session.status.value,
         transcript=session.transcript,
         summary=session.summary,
+        action_items=getattr(session, "action_items", []),
         scheduled_time=session.scheduled_time.isoformat() if session.scheduled_time else None,
-        language=session.language,
+        language=session.language.value,
         created_at=session.created_at.isoformat(),
         updated_at=session.updated_at.isoformat(),
         speaker_id=session.speaker_id,
     )
 
 
-@router.get("/sessions", response_model=list[SessionResponse])
-@router.get("/call-sessions", response_model=list[SessionResponse])
-async def list_sessions():
-    """List all call sessions."""
-    from app.services.call_session_service import list_sessions as list_all_sessions
-    sessions = await list_all_sessions()
-    return [
-        SessionResponse(
-            id=s.id,
-            room_id=s.room_id,
-            mode=s.mode,
-            target_number=s.target_number,
-            target_name=s.target_name,
-            context_prompt=s.context_prompt,
-            status=s.status,
-            transcript=s.transcript,
-            summary=s.summary,
-            scheduled_time=s.scheduled_time.isoformat() if s.scheduled_time else None,
-            language=s.language,
-            created_at=s.created_at.isoformat(),
-            updated_at=s.updated_at.isoformat(),
-            speaker_id=s.speaker_id,
-        )
-        for s in sessions
-    ]
+@router.get("/summary/{room_id}")
+async def get_call_summary(room_id: str):
+    """
+    Page 4 Call Summary Endpoint:
+    Fetches post-call transcript, executive summary, and action items from MongoDB Atlas.
+    If the summary hasn't been generated yet, runs Evon v3.3 summarization and persists it.
+    """
+    session = await get_session_by_room(room_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Call session '{room_id}' not found")
+
+    transcript = session.transcript or []
+    summary = session.summary
+    action_items = getattr(session, "action_items", [])
+
+    # If call finished with transcript but summary wasn't computed yet, compute with Evon
+    if transcript and (not summary or not action_items):
+        evon = evon_client()
+        try:
+            if not summary:
+                summary = await evon.summarize(transcript)
+            if not action_items:
+                action_items = await evon.extract_action_items(transcript)
+            await set_call_summary(session.id, summary, action_items)
+        except Exception as e:
+            logger.warning("Error generating summary on fetch: %s", e)
+            if not summary:
+                summary = "Call completed. Discussion captured in transcript."
+            if not action_items:
+                action_items = ["Review call transcript notes."]
+
+    duration = 0
+    if transcript and len(transcript) > 1:
+        try:
+            first_t = datetime.fromisoformat(transcript[0].get("timestamp", "").replace("Z", "+00:00"))
+            last_t = datetime.fromisoformat(transcript[-1].get("timestamp", "").replace("Z", "+00:00"))
+            duration = max(1, int((last_t - first_t).total_seconds()))
+        except Exception:
+            duration = max(15, len(transcript) * 12)
+
+    return SummaryResponse(
+        room_id=session.room_id,
+        status=session.status.value,
+        caller_name=getattr(session, "caller_name", "Ganesh"),
+        recipient_name=session.target_name or "Participant",
+        summary=summary or "Call completed. Discussion captured in transcript.",
+        action_items=action_items or ["Review call transcript notes."],
+        transcript=transcript,
+        duration_seconds=duration,
+        created_at=session.created_at.isoformat(),
+        updated_at=session.updated_at.isoformat(),
+    )
+
+
+@router.post("/calls/{room_id}/end")
+async def end_call_session(room_id: str):
+    """Explicitly terminate call, update status, and generate post-call summary + action items."""
+    session = await get_session_by_room(room_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Call session '{room_id}' not found")
+
+    await set_session_status(session.id, CallStatus.COMPLETED)
+
+    transcript = session.transcript or []
+    evon = evon_client()
+
+    summary = "Call ended."
+    action_items = []
+    if transcript:
+        try:
+            summary = await evon.summarize(transcript)
+            action_items = await evon.extract_action_items(transcript)
+        except Exception as exc:
+            logger.warning("Evon post-call summary error: %s", exc)
+            summary = "Call ended successfully with active dialogue recorded."
+            action_items = ["Follow up on discussed topics."]
+        await set_call_summary(session.id, summary, action_items)
+
+    return {
+        "status": "success",
+        "room_id": room_id,
+        "summary": summary,
+        "action_items": action_items,
+    }
 
 
 # --- WebSocket Connection Manager ---
 
 class ConnectionManager:
-    """Manages WebSocket connections for call sessions."""
+    """Manages active WebSockets for streaming voice calls."""
 
     def __init__(self):
         self.active_connections: dict[str, WebSocket] = {}
@@ -296,60 +445,48 @@ class ConnectionManager:
             del self.active_connections[room_id]
             logger.info("WebSocket disconnected: room_id=%s", room_id)
 
-    async def send_text(self, room_id: str, message: str):
-        if room_id in self.active_connections:
-            await self.active_connections[room_id].send_text(message)
-
-    async def send_json(self, room_id: str, data: dict):
-        if room_id in self.active_connections:
-            await self.active_connections[room_id].send_json(data)
-
 
 manager = ConnectionManager()
 
 
-# --- WebSocket Endpoint for Real-Time Call Streaming ---
+# --- Real-Time Streaming WebSocket ---
 
+@router.websocket("/ws/{room_id}")
 @router.websocket("/ws/call/{room_id}")
 async def call_websocket(websocket: WebSocket, room_id: str):
     """
-    Real-time WebSocket endpoint for voice call streaming.
-
-    Flow:
-    1. Client connects and session is loaded from MongoDB
-    2. Client streams microphone audio via WebSocket
-    3. Backend:
-       - Processes audio with Gnani STT
-       - Sends text to Evon v3.3 for response
-       - Streams response text back
-       - Synthesizes TTS audio with Gnani Timbre
-       - Streams audio bytes back to client
-
-    On disconnect:
-    - Generates session summary using Evon
-    - Saves transcript array + summary text to MongoDB
+    Core Voice AI Pipeline:
+    1. Client connects with mic audio stream.
+    2. Sends immediate warm audio greeting.
+    3. Streams two-way voice:
+       - Gnani STT processes incoming PCM audio
+       - Evon v3.3 streams conversational tokens
+       - Gnani TTS (with custom voice cloning speaker_id) synthesizes speech audio
+       - Streams audio bytes + live transcript back to client
+    4. On disconnect, auto-extracts summary and action items to MongoDB Atlas.
     """
     connection_id = f"{room_id}"
 
     try:
         await manager.connect(room_id, websocket)
 
-        # Load session from MongoDB (or auto-provision if on-the-fly room)
         session = await get_session_by_room(room_id)
         if session is None:
+            is_permanent = room_id.startswith("p-")
+            caller_name = room_id.replace("p-", "").capitalize() if is_permanent else "Ganesh"
             session = await create_session(
-                mode=CallMode.OUTBOUND,
+                mode=CallMode.INBOUND if is_permanent else CallMode.OUTBOUND,
                 target_number=None,
-                context_prompt="You are Ganesh's conversational voice assistant. Greet the recipient warmly and converse naturally in English.",
-                language=Language.ENGLISH,
                 target_name="Recipient",
+                caller_name=caller_name,
+                context_prompt=f"You are {caller_name}'s personal voice assistant. Greet the recipient warmly and speak conversationally.",
+                language=Language.ENGLISH,
                 room_id=room_id,
             )
 
-        # Update session status to active (skip scheduled -> pending for now)
         await set_session_status(session.id, CallStatus.ACTIVE)
 
-        # Initialize clients
+        # Initialize STT & TTS clients
         stt_client = GnaniSTTClient(
             api_key=None,
             language=session.language,
@@ -365,30 +502,29 @@ async def call_websocket(websocket: WebSocket, room_id: str):
 
         evon = evon_client()
 
-        # Build system instruction for Evon from context_prompt
-        persona = (
-            "You MUST speak exactly as the persona described below. "
-            "NEVER introduce yourself as an AI, bot, or assistant. Never break character. "
-            "Use natural speech patterns, filler words like 'umm', 'ah', 'you know' sparingly. "
-            "Respond conversationally."
-        )
-        system_prompt = f"{persona}\n\n{session.context_prompt}"
+        caller = getattr(session, "caller_name", "Ganesh")
+        recipient = session.target_name or "there"
+        tone = getattr(session, "voice_tone", "natural")
 
-        # Store conversation history
+        persona = (
+            f"You are {caller}'s autonomous personal voice assistant speaking directly with {recipient}. "
+            f"Maintain a {tone}, natural, polite conversational tone. "
+            f"Never break character. Keep responses concise (1-3 sentences) suitable for a live phone conversation."
+        )
+        system_prompt = f"{persona}\n\nCall Objective / Context:\n{session.context_prompt}"
+
         conversation_history = [{"role": "system", "content": system_prompt}]
-        audio_chunks: list[bytes] = []
         transcript_entries: list[dict] = []
 
-        # Send ready signal
         await websocket.send_json({
             "type": "ready",
             "status": "active",
-            "message": "Connected. Starting call session...",
-            "system_prompt": system_prompt[:100] + "..." if len(system_prompt) > 100 else system_prompt,
+            "caller_name": caller,
+            "recipient_name": recipient,
+            "message": "Connected to voice call engine.",
         })
 
-        async def synthesize_sentence(text: str) -> None:
-            """Synthesize a complete sentence and stream audio bytes to the client."""
+        async def synthesize_and_send(text: str) -> None:
             if not text.strip():
                 return
             try:
@@ -396,174 +532,142 @@ async def call_websocket(websocket: WebSocket, room_id: str):
                 if tts_audio and len(tts_audio) > 44:
                     await websocket.send_bytes(tts_audio)
             except Exception as e:
-                logger.exception("TTS synthesis failed for sentence: %s", e)
+                logger.warning("TTS synthesis error: %s", e)
 
         async def process_turn(user_text: str) -> str:
-            """Process a turn: STT -> Evon -> sentence-chunked TTS -> return text and audio."""
-            # Send callee transcript to frontend immediately
+            # Emit callee transcript
             await websocket.send_json({
                 "type": "transcript",
                 "data": {
                     "role": "callee",
+                    "speaker": recipient,
                     "text": user_text,
                     "language": session.language.value,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                 },
             })
 
-            # Add user turn to history
             conversation_history.append({"role": "user", "content": user_text})
-
-            transcript_entry_user = {
+            u_entry = {
                 "role": "user",
-                "speaker": "User",
+                "speaker": recipient,
                 "text": user_text,
                 "language": session.language.value,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
-            transcript_entries.append(transcript_entry_user)
+            transcript_entries.append(u_entry)
+            await append_transcript(session.id, u_entry)
 
-            # Get response from Evon, streaming tokens into a sentence buffer
+            # Evon streaming response
             evon_response = ""
             sentence_buffer = ""
 
-            async for chunk in evon.chat(conversation_history, max_tokens=512, temperature=0.7):
+            async for chunk in evon.chat(conversation_history, max_tokens=256, temperature=0.7):
                 evon_response += chunk
                 sentence_buffer += chunk
                 await websocket.send_json({"type": "text_chunk", "text": chunk})
 
-                # Check for sentence boundary
                 if any(c in chunk for c in '.!?'):
-                    await synthesize_sentence(sentence_buffer.strip())
+                    await synthesize_and_send(sentence_buffer.strip())
                     sentence_buffer = ""
 
-            # Flush any remaining partial sentence
             if sentence_buffer.strip():
-                await synthesize_sentence(sentence_buffer.strip())
+                await synthesize_and_send(sentence_buffer.strip())
 
-            # Add agent response to history
             conversation_history.append({"role": "assistant", "content": evon_response})
 
-            # Send agent transcript to frontend
+            # Emit agent transcript
             await websocket.send_json({
                 "type": "transcript",
                 "data": {
                     "role": "agent",
+                    "speaker": f"{caller}'s AI Agent",
                     "text": evon_response,
                     "language": session.language.value,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                 },
             })
 
-            transcript_entry_agent = {
+            a_entry = {
                 "role": "assistant",
-                "speaker": "AI Agent",
+                "speaker": f"{caller}'s AI Agent",
                 "text": evon_response,
                 "language": session.language.value,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
-            transcript_entries.append(transcript_entry_agent)
+            transcript_entries.append(a_entry)
+            await append_transcript(session.id, a_entry)
 
             return evon_response
 
-        # Automatically deliver opening greeting so the call starts speaking immediately!
-        initial_greeting = f"Hello! This is {session.target_name or 'Ganesh'}. Thanks for joining the call! How can I help you today?"
+        # Automatic initial greeting
+        initial_greeting = f"Hello {recipient}! This is {caller}'s AI voice assistant. Thanks for answering! How can I help you today?"
         await websocket.send_json({
             "type": "transcript",
             "data": {
                 "role": "agent",
+                "speaker": f"{caller}'s AI Agent",
                 "text": initial_greeting,
                 "language": session.language.value,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         })
         conversation_history.append({"role": "assistant", "content": initial_greeting})
-        transcript_entries.append({
+        g_entry = {
             "role": "assistant",
-            "speaker": "AI Agent",
+            "speaker": f"{caller}'s AI Agent",
             "text": initial_greeting,
             "language": session.language.value,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
-        await synthesize_sentence(initial_greeting)
+        }
+        transcript_entries.append(g_entry)
+        await append_transcript(session.id, g_entry)
+        await synthesize_and_send(initial_greeting)
 
-        try:
-            while True:
-                # Receive message or audio chunk from client
-                data = await websocket.receive()
-                dtype = data.get("type") if isinstance(data, dict) else getattr(data, "type", None)
+        while True:
+            data = await websocket.receive()
+            dtype = data.get("type") if isinstance(data, dict) else getattr(data, "type", None)
 
-                if dtype == "websocket.receive":
-                    dbytes = data.get("bytes") if isinstance(data, dict) else getattr(data, "bytes", None)
-                    dtext = data.get("text") if isinstance(data, dict) else getattr(data, "text", None)
+            if dtype == "websocket.receive":
+                dbytes = data.get("bytes") if isinstance(data, dict) else getattr(data, "bytes", None)
+                dtext = data.get("text") if isinstance(data, dict) else getattr(data, "text", None)
 
-                    if dbytes:
-                        # Raw audio bytes - transcribe with Gnani STT
-                        transcribed = await stt_client.transcribe(dbytes, filename="mic_input.wav")
-
-                        if transcribed:
-                            logger.info("STT result: %s", transcribed[:50])
-                            response_text = await process_turn(transcribed)
-
-                            if not response_text:
-                                await websocket.send_json({
-                                    "type": "error",
-                                    "message": "No response generated",
-                                })
-                    elif dtext:
-                        # Text message from client
-                        try:
-                            msg = json.loads(dtext)
-                            mtype = msg.get("type")
-                            if mtype == "ping":
-                                await websocket.send_json({"type": "pong", "timestamp": datetime.now().isoformat()})
-                            elif mtype in ["message", "speak", "text"]:
-                                user_text = msg.get("text") or msg.get("message") or ""
-                                if user_text.strip():
-                                    await process_turn(user_text.strip())
-                            elif mtype == "stop":
-                                break
-                        except json.JSONDecodeError:
-                            pass
-
-                elif dtype == "websocket.disconnect":
-                    break
-
-        except WebSocketDisconnect:
-            logger.info("WebSocket disconnected by client: %s", connection_id)
-        except Exception as e:
-            logger.exception("WebSocket error: %s", e)
-            try:
-                await websocket.send_json({"type": "error", "message": str(e)})
-            except:
-                pass
+                if dbytes:
+                    transcribed = await stt_client.transcribe(dbytes, filename="audio.wav")
+                    if transcribed and transcribed.strip():
+                        await process_turn(transcribed.strip())
+                elif dtext:
+                    try:
+                        msg = json.loads(dtext)
+                        mtype = msg.get("type")
+                        if mtype == "ping":
+                            await websocket.send_json({"type": "pong", "timestamp": datetime.now().isoformat()})
+                        elif mtype in ["message", "speak", "text"]:
+                            user_text = msg.get("text") or msg.get("message") or ""
+                            if user_text.strip():
+                                await process_turn(user_text.strip())
+                        elif mtype in ["hangup", "end", "stop"]:
+                            break
+                    except json.JSONDecodeError:
+                        pass
+            elif dtype == "websocket.disconnect":
+                break
 
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected: %s", connection_id)
-    except Exception as e:
-        logger.exception("WebSocket connection error: %s", e)
+    except Exception as exc:
+        logger.exception("WebSocket call session error: %s", exc)
     finally:
         manager.disconnect(room_id)
-
-        # Generate summary and save transcript on disconnect
+        # Finalize call session status and auto-generate summary
         try:
-            # Generate summary using Evon
-            summary_text = await evon.summarize(transcript_entries) if transcript_entries else "Call completed with no meaningful conversation."
-
-            # Save transcript entries to MongoDB
-            for entry in transcript_entries:
-                await append_transcript(session.id, entry)
-
-            # Save summary to MongoDB
-            await set_call_summary(session.id, summary_text)
-
-            logger.info("Call session completed: room_id=%s, summary=%s", room_id, summary_text[:50] if summary_text else "N/A")
-
+            session = await get_session_by_room(room_id)
+            if session:
+                await set_session_status(session.id, CallStatus.COMPLETED)
+                if transcript_entries and (not session.summary or not session.action_items):
+                    evon = evon_client()
+                    summary = await evon.summarize(transcript_entries)
+                    action_items = await evon.extract_action_items(transcript_entries)
+                    await set_call_summary(session.id, summary, action_items)
         except Exception as e:
-            logger.exception("Error during session finalization: %s", e)
-
-        # Clean up clients
-        try:
-            await stt_client.close()
-            await tts_client.close()
-        except:
-            pass
-
-    return JSONResponse({"status": "completed"})
+            logger.warning("Error generating final summary on disconnect: %s", e)

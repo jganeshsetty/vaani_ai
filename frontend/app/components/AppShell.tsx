@@ -10,259 +10,144 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
-  const [callerName, setCallerName] = useState('Ganesh');
+  const [darkMode, setDarkMode] = useState(false);
+  const [userName, setUserName] = useState('Ganesh');
 
   useEffect(() => {
     try {
-      const savedName = localStorage.getItem('vaani_caller_name');
-      if (savedName) setCallerName(savedName);
+      const isDark = localStorage.getItem('vaani_theme') === 'dark';
+      setDarkMode(isDark);
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+
+      const saved = localStorage.getItem('vaani_user_name');
+      if (saved) setUserName(saved);
     } catch (e) {}
   }, []);
 
-  // Landing page and Authentication page have their own complete layouts
-  if (pathname === '/' || pathname === '/login') {
-    return <main className="w-full min-h-screen bg-[#faf8ff] text-[#131b2e]">{children}</main>;
+  const toggleDarkMode = () => {
+    const next = !darkMode;
+    setDarkMode(next);
+    try {
+      localStorage.setItem('vaani_theme', next ? 'dark' : 'light');
+      if (next) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    } catch (e) {}
+  };
+
+  // If in active call room, render isolated native dialer interface with zero outer distractions
+  const isCallRoom = pathname.startsWith('/call/');
+  if (isCallRoom) {
+    return (
+      <div className={`min-h-screen ${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} antialiased`}>
+        {children}
+      </div>
+    );
   }
 
-  const isDashboard = pathname === '/dashboard' || pathname === '/new-call';
-  const isMessage = pathname === '/dashboard/message';
-  const isLiveCall = pathname === '/dashboard/live' || pathname === '/call/live';
-  const isHistory = pathname === '/call/history' || pathname === '/dashboard/history';
-
-  const initials =
-    callerName
-      .split(' ')
-      .filter(Boolean)
-      .map((p) => p[0].toUpperCase())
-      .slice(0, 2)
-      .join('') || 'G';
+  const isInitiate = pathname === '/initiate';
+  const isSetup = pathname === '/setup';
+  const isHome = pathname === '/';
+  const isSummary = pathname.startsWith('/summary/');
 
   return (
-    <div className="min-h-screen bg-[#faf8ff] text-[#131b2e] font-sans antialiased">
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-white z-50 flex-col py-6 px-4 border-r border-slate-200 shadow-sm">
-        {/* Brand / Logo */}
-        <Link href="/dashboard" className="px-3 mb-8 flex items-center gap-3 group">
-          <div className="w-9 h-9 rounded-xl bg-primary-container flex items-center justify-center text-white shadow-md shadow-primary-container/20 group-hover:bg-primary transition-all">
-            <span className="material-symbols-outlined text-[20px]">phone_in_talk</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[17px] font-bold text-[#131b2e] tracking-tight">VaaniCall AI</span>
-            <span className="text-[11px] text-slate-500 font-normal">Multilingual Voice Agent</span>
-          </div>
-        </Link>
-
-        {/* Navigation List */}
-        <nav className="flex-1 space-y-1.5">
-          <Link
-            href="/dashboard"
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] min-h-[44px] transition-all ${
-              isDashboard
-                ? 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200/60 shadow-xs'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[20px]">add_call</span>
-            <span>Manual Call</span>
-          </Link>
-
-          <Link
-            href="/dashboard/message"
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] min-h-[44px] transition-all ${
-              isMessage
-                ? 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200/60 shadow-xs'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[20px]">chat</span>
-            <span>Call Message Setup</span>
-          </Link>
-
-          <Link
-            href="/dashboard/live"
-            className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[14px] min-h-[44px] transition-all ${
-              isLiveCall
-                ? 'bg-primary-container text-white font-semibold shadow-md shadow-primary-container/25'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <span
-                className="material-symbols-outlined text-[20px]"
-                style={isLiveCall ? { fontVariationSettings: "'FILL' 1" } : undefined}
-              >
-                podcasts
-              </span>
-              <span>Live Call</span>
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${
+      darkMode ? 'dark bg-[#0b0f19] text-slate-100' : 'bg-[#f8fafc] text-slate-900'
+    }`}>
+      {/* Top Navigation Bar */}
+      <header className={`sticky top-0 z-50 backdrop-blur-md border-b transition-colors ${
+        darkMode ? 'bg-[#0b0f19]/80 border-slate-800' : 'bg-white/80 border-slate-200/80 shadow-xs'
+      }`}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          {/* Logo & Brand */}
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-all">
+              <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                <path d="M20 15.5c-1.25 0-2.45-.2-3.57-.57a1.02 1.02 0 00-1.02.24l-2.2 2.2a15.045 15.045 0 01-6.59-6.59l2.2-2.21a.96.96 0 00.25-1A11.36 11.36 0 018.5 4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 9.39 9.39 17 17 17 17 .55 0 1-.45 1-1v-3.5c0-.55-.45-1-1-1zM19 12h2a9 9 0 00-9-9v2a7 7 0 017 7z" />
+              </svg>
             </div>
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                isLiveCall ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700'
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                  VaaniCall AI
+                </span>
+                <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                  v3.3
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Autonomous Voice Calling</p>
+            </div>
+          </Link>
+
+          {/* Navigation Links */}
+          <nav className="flex items-center gap-1 sm:gap-2">
+            <Link
+              href="/initiate"
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all min-h-[44px] ${
+                isInitiate
+                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 font-semibold shadow-xs border border-emerald-200/60 dark:border-emerald-800'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
-              <span
-                className={`w-1.5 h-1.5 rounded-full mr-1 ${
-                  isLiveCall ? 'bg-cyan-300 animate-pulse' : 'bg-indigo-600'
-                }`}
-              />
-              Active
-            </span>
-          </Link>
-
-          <Link
-            href="/call/history"
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] min-h-[44px] transition-all ${
-              isHistory
-                ? 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200/60 shadow-xs'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[20px]">history</span>
-            <span>Call History</span>
-          </Link>
-        </nav>
-
-        {/* Engine status pill */}
-        <div className="px-2 pt-4 border-t border-slate-200 mb-3">
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse shrink-0" />
-            <div className="flex flex-col min-w-0">
-              <span className="text-[12px] font-semibold text-slate-800 leading-tight">AI Voice Assistant</span>
-              <span className="text-[10.5px] text-slate-500 truncate">Online &amp; Ready</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Profile Card & Logout */}
-        <div className="pt-2 px-2 flex items-center justify-between border-t border-slate-100">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center justify-center font-bold text-xs shrink-0">
-              {initials}
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-[13px] font-semibold text-slate-800 truncate leading-tight">{callerName}</span>
-              <span className="text-[11px] text-slate-500 truncate">Personal Account</span>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              if (typeof window !== 'undefined') {
-                localStorage.removeItem('vaani_jwt');
-                document.cookie = 'vaani_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-                window.location.href = '/login';
-              }
-            }}
-            title="Log out"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[18px]">logout</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* Main View Area */}
-      <div className="md:pl-64 flex flex-col min-h-screen bg-[#faf8ff]">
-        {/* Top Header */}
-        <header className="h-16 px-4 md:px-8 bg-white/90 backdrop-blur sticky top-0 z-40 flex items-center justify-between border-b border-slate-200/80 shadow-xs gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            {/* Mobile Logo */}
-            <Link href="/dashboard" className="md:hidden flex items-center gap-2 shrink-0">
-              <div className="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center text-white">
-                <span className="material-symbols-outlined text-[18px]">phone_in_talk</span>
-              </div>
-              <span className="font-bold text-[15px] text-slate-900">Vaani</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>Initiate Call</span>
             </Link>
 
-            {/* Top Navigation 2 Pages Switcher according to design */}
-            <div className="flex items-center gap-1 p-1 bg-[#f2f3ff] rounded-xl border border-[#eaedff]">
-              <Link
-                href="/dashboard"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                  isDashboard || isLiveCall
-                    ? 'bg-white text-primary shadow-xs border border-[#dae2fd]'
-                    : 'text-[#464555] hover:text-[#131b2e]'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[16px]">add_call</span>
-                <span className="hidden sm:inline">1. Manual Calling</span>
-                <span className="sm:hidden">1. Call</span>
-              </Link>
-              <Link
-                href="/dashboard/message"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                  isMessage
-                    ? 'bg-white text-primary shadow-xs border border-[#dae2fd]'
-                    : 'text-[#464555] hover:text-[#131b2e]'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[16px]">chat</span>
-                <span className="hidden sm:inline">2. Call Message Setup</span>
-                <span className="sm:hidden">2. Message</span>
-              </Link>
-            </div>
-          </div>
+            <Link
+              href="/setup"
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all min-h-[44px] ${
+                isSetup
+                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 font-semibold shadow-xs border border-emerald-200/60 dark:border-emerald-800'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>Setup & Permanent Link</span>
+            </Link>
 
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className="text-right hidden sm:block">
-                <div className="text-xs font-semibold text-slate-900 leading-tight">{callerName}</div>
-                <div className="text-[11px] text-slate-500 leading-tight">+91 98450 •••••</div>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 font-semibold text-xs flex items-center justify-center">
-                {initials}
-              </div>
-            </div>
-          </div>
-        </header>
+            {/* Dark Mode Toggle */}
+            <button
+              onClick={toggleDarkMode}
+              title="Toggle theme"
+              aria-label="Toggle theme"
+              className="p-2.5 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ml-1 min-w-[44px] min-h-[44px] flex items-center justify-center"
+            >
+              {darkMode ? (
+                <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              )}
+            </button>
+          </nav>
+        </div>
+      </header>
 
-        {/* Page Content */}
-        <main className="flex-1 pb-20 md:pb-8">{children}</main>
-      </div>
+      {/* Main Content Area */}
+      <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {children}
+      </main>
 
-      {/* Mobile Bottom Navigation with Min 44px Touch Targets */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white/95 backdrop-blur-md border-t border-slate-200 z-50 flex items-center justify-around px-2 shadow-lg">
-        <Link
-          href="/dashboard"
-          className={`min-h-[48px] min-w-[54px] flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-lg transition-colors ${
-            isDashboard ? 'text-indigo-600 font-bold' : 'text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          <span className="material-symbols-outlined text-xl">add_call</span>
-          <span className="text-[11px] font-medium">Call</span>
-        </Link>
-        <Link
-          href="/dashboard/message"
-          className={`min-h-[48px] min-w-[54px] flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-lg transition-colors ${
-            isMessage ? 'text-indigo-600 font-bold' : 'text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          <span className="material-symbols-outlined text-xl">chat</span>
-          <span className="text-[11px] font-medium">Message</span>
-        </Link>
-        <Link
-          href="/dashboard/live"
-          className={`min-h-[48px] min-w-[54px] flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-lg transition-colors ${
-            isLiveCall ? 'text-indigo-600 font-bold' : 'text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          <span
-            className="material-symbols-outlined text-xl"
-            style={isLiveCall ? { fontVariationSettings: "'FILL' 1" } : undefined}
-          >
-            podcasts
-          </span>
-          <span className="text-[11px] font-medium">Live</span>
-        </Link>
-        <Link
-          href="/call/history"
-          className={`min-h-[48px] min-w-[54px] flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-lg transition-colors ${
-            isHistory ? 'text-indigo-600 font-bold' : 'text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          <span className="material-symbols-outlined text-xl">history</span>
-          <span className="text-[11px] font-medium">History</span>
-        </Link>
-      </nav>
+      {/* Clean Minimal Footer */}
+      <footer className={`border-t py-6 text-center text-xs transition-colors ${
+        darkMode ? 'border-slate-800/80 text-slate-500 bg-[#0b0f19]' : 'border-slate-200 text-slate-400 bg-white/50'
+      }`}>
+        <p>VaaniCall AI • Powered by Gnani Speech & Evon v3.3 • Zero-Lag Real-Time Voice</p>
+      </footer>
     </div>
   );
 }

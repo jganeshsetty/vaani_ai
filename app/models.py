@@ -92,12 +92,15 @@ class CallSessionOut(BaseModel):
     mode: CallMode
     target_number: Optional[str] = None
     target_name: Optional[str] = None
+    caller_name: Optional[str] = "Ganesh"
     context_prompt: str
+    voice_tone: Optional[str] = "natural"
     status: CallStatus = CallStatus.PENDING
     transcript: list[dict] = Field(default_factory=list)
     summary: Optional[str] = None
+    action_items: list[str] = Field(default_factory=list)
     scheduled_time: Optional[datetime] = None
-    language: Language = Language.KANNADA
+    language: Language = Language.ENGLISH
     created_at: datetime
     updated_at: datetime
     speaker_id: Optional[str] = None

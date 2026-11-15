@@ -94,13 +94,25 @@ class InMemoryCollection:
             matching = cursor._docs
         return deepcopy(matching[0])
 
-    async def update_one(self, filter: Dict[str, Any], update: Dict[str, Any]) -> None:
+    async def update_one(self, filter: Dict[str, Any], update: Dict[str, Any], upsert: bool = False) -> None:
         target = None
         for d in self._docs:
             if self._matches(d, filter):
                 target = d
                 break
         if not target:
+            if upsert:
+                new_doc = {"_id": ObjectId()}
+                for k, v in filter.items():
+                    if not k.startswith("$"):
+                        new_doc[k] = deepcopy(v)
+                if "$setOnInsert" in update:
+                    for k, v in update["$setOnInsert"].items():
+                        new_doc[k] = deepcopy(v)
+                if "$set" in update:
+                    for k, v in update["$set"].items():
+                        new_doc[k] = deepcopy(v)
+                self._docs.append(new_doc)
             return
 
         if "$set" in update:
