@@ -3,28 +3,48 @@ import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const token = request.cookies.get('vaani_token')?.value;
 
-  // Protect /dashboard and nested routes
-  if (pathname.startsWith('/dashboard')) {
-    if (!token) {
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(loginUrl);
-    }
+  // Gracefully redirect legacy routes from the old architecture to the streamlined pages
+  const legacyRedirects: Record<string, string> = {
+    '/dashboard': '/initiate',
+    '/dashboard/live': '/initiate',
+    '/dashboard/message': '/initiate',
+    '/new-call': '/initiate',
+    '/login': '/initiate',
+    '/busy': '/setup',
+    '/voice-studio': '/setup',
+    '/voice-studio/settings': '/setup',
+    '/call/live': '/initiate',
+    '/call/history': '/setup',
+    '/call/details': '/setup',
+  };
+
+  if (legacyRedirects[pathname]) {
+    return NextResponse.redirect(new URL(legacyRedirects[pathname], request.url));
   }
 
-  // If already authenticated and visiting /login, redirect to /dashboard
-  if (pathname === '/login') {
-    if (token) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
-    }
+  if (pathname.startsWith('/dashboard/')) {
+    return NextResponse.redirect(new URL('/initiate', request.url));
+  }
+
+  if (pathname.startsWith('/voice-studio/')) {
+    return NextResponse.redirect(new URL('/setup', request.url));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login'],
+  matcher: [
+    '/dashboard/:path*',
+    '/dashboard',
+    '/login',
+    '/busy',
+    '/voice-studio/:path*',
+    '/voice-studio',
+    '/new-call',
+    '/call/live',
+    '/call/history',
+    '/call/details',
+  ],
 };
-
