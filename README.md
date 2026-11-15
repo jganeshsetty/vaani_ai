@@ -1,142 +1,70 @@
-# Vaani AI Backend Configuration
+# Vaani AI
 
-This document describes how to configure the Vaani AI backend with environment variables for deployment to Google Cloud Run and Docker.
+Dual-mode AI voice assistant with web-based calling. Outbound scheduling via browser; inbound busy-screening via a native doorway redirect. No telephony dependencies.
 
-## Prerequisites
+## Architecture
 
-Before deploying, you need to set up the following resources:
+- **Backend**: FastAPI + Motor (MongoDB), hosted on Render
+- **Frontend**: Next.js 15 (App Router)
+- **AI Model**: Evon v3.3 (`gnani/gnani-evon-v3.3-30B-A3B`) via Hugging Face Inference API
+- **Speech**: Gnani Prisma (STT) + Timbre (TTS)
+- **Scheduler**: APScheduler promoting `scheduled` sessions → `pending` every 60s
 
-### 1. MongoDB
-- **Local Development**: Use MongoDB with default connection `mongodb://localhost:27017/vaani_ai`
-- **GCP Cloud SQL / Atlas**: Use your MongoDB Atlas connection string
+### Modes
 
-### 2. Hugging Face
-- API Key from: https://huggingface.co/settings/tokens
-- Model: `gnani/gnani-evon-v3.3-30B-A3B`
+| Mode | Entry Point | Flow |
+|------|-------------|------|
+| **Outbound** | `/dashboard` | User submits call request (or schedules) → `POST /api/outbound` → redirected to `/call/{room_id}` for live WebSocket call |
+| **Inbound (Busy)** | `/busy` | Phone landing page POSTs `generate-busy-session` → instant redirect to `/call/{room_id}?mode=inbound&busy=true` with default screening prompt |
 
-### 3. Gnani.ai
-- API Key from: https://gnani.ai/developer-dashboard
-- Unified key covers both Prisma (STT) and Timbre (TTS)
-
-### 4. Meta WhatsApp Business API
-- Phone Number ID from Meta Developer Console
-- Access Token from Meta Developer Console
-
-### 5. Google Cloud Platform
-- Project ID from Google Cloud Console
-- GCS bucket name for audio storage
-- Service account key (for local development only)
+Both modes share the same WebSocket call pipeline:
+```
+Browser mic → WebSocket → Gnani STT → Evon v3.3 → Gnani TTS → back to browser
+```
+On disconnect, Evon summarizes the transcript; results persist in MongoDB (no audio files saved).
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and fill in your values:
+Copy `.env.example` to `.env`:
 
 ```bash
-# MongoDB Configuration
 VAANI_MONGODB_URI=mongodb://localhost:27017/vaani_ai
 VAANI_MONGODB_DB=vaani_ai
-
-# Hugging Face API (Evon v3.3)
-VAANI_HUGGINGFACE_API_KEY=your_huggingface_api_key_here
-
-# Gnani.ai Speech APIs (STT & TTS)
-VAANI_GNANI_API_KEY=your_gnani_api_key_here
-
-# Meta WhatsApp Business API
-VAANI_WHATSAPP_PHONE_NUMBER_ID=your_whatsapp_phone_number_id
-VAANI_WHATSAPP_ACCESS_TOKEN=your_whatsapp_access_token
-
-# Google Cloud Platform (GCP)
-VAANI_GCP_PROJECT_ID=your_gcp_project_id
-VAANI_GCS_BUCKET_NAME=your_gcs_bucket_name
-VAANI_GOOGLE_APPLICATION_CREDENTIALS=path/to/service-account-key.json
-
-# Server Configuration
-VAANI_HOST=0.0.0.0
-VAANI_PORT=8000
-
-# CORS Configuration
-VAANI_CORS_ORIGINS=https://your-domain.com,https://www.your-domain.com
-
-# Optional Features
-VAANI_VAD_ENABLED=true
-VAANI_VAD_ENERGY_THRESHOLD=350
-VAANI_MAX_CALL_TURNS=4
-VAANI_ENABLE_TTS_CACHE=true
-VAANI_CONCISE_MODE=true
+VAANI_HUGGINGFACE_API_KEY=your_huggingface_api_key
+VAANI_GNANI_API_KEY=your_gnani_api_key
 ```
 
-## Docker Deployment
+Render env vars are configured in `render.yaml`.
 
-Use `docker-compose.yml` to deploy locally with MongoDB:
+## Local Development
+
+```bash
+# Backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+
+# Frontend
+cd frontend && npm install && npm run dev
+```
+
+## Docker
 
 ```bash
 docker compose up -d
 ```
 
-## Google Cloud Run Deployment
+## Deployment
 
-1. Build Docker image:
-```bash
-docker build -t vaani-backend .
-```
+Deploy backend and frontend as separate services on Render:
+- Backend: `services.vaani-backend` (from `render.yaml`)
+- Frontend: `services.vaani-frontend` with `NEXT_PUBLIC_API_URL` pointing to backend URL
 
-2. Push to Google Container Registry:
-```bash
-docker push gcr.io/PROJECT_ID/vaani-backend:latest
-```
+## API Endpoints
 
-3. Deploy to Cloud Run:
-```bash
-gcloud run deploy vaani-backend \
-  --image gcr.io/PROJECT_ID/vaani-backend:latest \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --set-env-vars "VAANI_MONGODB_URI=mongodb://localhost:27017/vaani_ai" \
-  --set-env-vars "VAANI_MONGODB_DB=vaani_ai" \
-  --set-env-vars "VAANI_GNANI_API_KEY=your_gnani_api_key_here" \
-  --set-env-vars "VAANI_WHATSAPP_PHONE_NUMBER_ID=your_whatsapp_phone_number_id" \
-  --set-env-vars "VAANI_WHATSAPP_ACCESS_TOKEN=your_whatsapp_access_token" \
-  --set-env-vars "VAANI_GCP_PROJECT_ID=your_gcp_project_id" \
-  --set-env-vars "VAANI_GCS_BUCKET_NAME=your_gcs_bucket_name"
-```
-
-## Frontend
-
-The frontend uses Next.js and connects to the backend via environment variables:
-
-- `NEXT_PUBLIC_API_URL`: Base URL for API calls
-- Copy `frontend/.env.example` to `frontend/.env.local` for local development
-
-## Security Notes
-
-- Never commit `.env` files with real credentials
-- Use Google Secret Manager for production deployments
-- Ensure CORS origins are properly configured
-- Test for port conflicts in Cloud Run (default port 8000)
-
-## Files Created/Modified
-
-### New Files
-- `Dockerfile`: Optimized for Google Cloud Run deployment
-- `docker-compose.yml`: Local development with MongoDB
-- `render.yaml`: Alternative deployment configuration
-
-### Modified Files
-- `.env.example`: Added all required configuration variables
-- `app/config.py`: Removed unused imports, simplified to use Field defaults
-- `frontend/next.config.mjs`: Removed `NEXT_PUBLIC_N8N_WEBHOOK_URL` environment variable
-- `frontend/app/api/client.ts`: Replaced Exotel field names (`exotel_call_sid`, `exotel_media_sid`) with generic (`call_sid`, `media_sid`) to support dual-mode architecture
-
-## Configuration Checklist
-
-- [ ] Set MongoDB connection string
-- [ ] Configure Hugging Face API key
-- [ ] Configure Gnani.ai API key
-- [ ] Configure WhatsApp Business API credentials
-- [ ] Configure GCP project and bucket details
-- [ ] Set appropriate CORS origins
-- [ ] Test all environment variables
-
-For more information, visit the Vaani AI documentation or contact the development team.
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/outbound` | Create outbound session (optionally schedule) |
+| POST | `/api/generate-busy-session` | Create inbound busy-mode session |
+| GET | `/api/sessions` | List all call sessions |
+| GET | `/api/sessions/room/{room_id}` | Fetch session by room ID |
+| WS | `/ws/call/{room_id}` | Real-time audio streaming (binary) |

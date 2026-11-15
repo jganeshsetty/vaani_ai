@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createSession } from '@/app/api/client';
+import { createOutboundCall } from '@/app/api/client';
 
 export default function NewCallDashboard() {
   const router = useRouter();
@@ -12,13 +13,14 @@ export default function NewCallDashboard() {
   const [countryCode, setCountryCode] = useState('+91');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [instructions, setInstructions] = useState('');
-  const [languageMode, setLanguageMode] = useState<'auto' | 'kannada' | 'english' | 'kanglish'>('kannada');
+  const [languageMode, setLanguageMode] = useState<'auto' | 'kannada' | 'english' | 'kanglish'>('english');
   const [voiceProfile, setVoiceProfile] = useState('aarohi');
   const [customVoices, setCustomVoices] = useState<any[]>([]);
   const [consent, setConsent] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
+  const [scheduleTime, setScheduleTime] = useState('');
 
   // Sync with localStorage on mount & verify JWT auth token
   useEffect(() => {
@@ -92,8 +94,8 @@ export default function NewCallDashboard() {
         window.speechSynthesis.cancel();
         const text =
           voiceId === 'sunil' || voiceId === 'custom'
-            ? `ಹೇ, ನಮಸ್ತೆ! ನಾನು ${callerName}. ಆರಾಮಾಗಿದ್ದೀರಾ?`
-            : `ನಮಸ್ಕಾರ, ನಾನು ಆರೋಹಿ. ನಿಮ್ಮ ಕೆಲಸವನ್ನು ನಾನು ಮಾತನಾಡುತ್ತೇನೆ.`;
+            ? `Hello! This is ${callerName}. How are you doing today?`
+            : `Hello, I am Aarohi. I am calling to assist you with your request.`;
 
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.rate = 1.0;
@@ -133,26 +135,20 @@ export default function NewCallDashboard() {
         : `[CALLER_PERSONA: Speak politely as ${callerName}.] ${instructions}`;
 
     try {
-      // 1. Create call session with new CallSession API
-      const session = await createSession({
-        mode: 'outbound',
+      const result = await createOutboundCall({
         target_number: fullNumber,
         target_name: 'Recipient',
         context_prompt: personaInstruction,
-        language: languageMode === 'auto' ? 'kannada' : languageMode,
+        schedule_time: scheduleTime || null,
       });
 
-      if (!session.id) {
+      if (!result.room_id) {
         setError('Failed to create call session');
         return;
       }
 
-      // 2. Navigate to mobile call interface with room_id
-      router.push(
-        `/call/${session.id}?caller=${encodeURIComponent(callerName)}&phone=${encodeURIComponent(
-          fullNumber
-        )}&desc=${encodeURIComponent(instructions)}`
-      );
+      // Navigate to mobile call interface with room_id
+      router.replace(`/call/${result.room_id}?mode=outbound`);
     } catch (err: any) {
       console.warn('Backend call trigger failed:', err);
       const errMsg = err?.message || 'Failed to connect to backend server.';
@@ -162,8 +158,10 @@ export default function NewCallDashboard() {
     }
   };
 
+
+
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-10 max-w-3xl mx-auto">
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-10 max-w-3xl mx-auto space-y-6">
       {/* Friendly Hero */}
       <div className="text-center mb-6 sm:mb-8">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#e2dfff] text-primary text-xs font-semibold mb-3">
@@ -174,7 +172,7 @@ export default function NewCallDashboard() {
           What call would you like me to make?
         </h1>
         <p className="text-sm sm:text-[15px] text-[#464555] mt-2 max-w-lg mx-auto leading-relaxed">
-          Speaks directly as you in natural, informal Kannada or English without any AI robotic clichés.
+          Speaks directly as you in natural, conversational, and easy-to-understand English without robotic clichés.
         </p>
       </div>
 
@@ -335,7 +333,7 @@ export default function NewCallDashboard() {
             <p className="text-[11px] text-[#464555] mt-1.5 flex items-center gap-1">
               <span className="material-symbols-outlined text-[14px] text-amber-600">info</span>
               <span>
-                <strong>Secure Connection:</strong> A WhatsApp Magic Link will be sent to this number for you to join the voice call session securely.
+                <strong>Secure Connection:</strong> Join the web-based voice session directly through your browser — no app or telephony required.
               </span>
             </p>
           </div>
@@ -343,9 +341,11 @@ export default function NewCallDashboard() {
           {/* Task Instructions */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-semibold text-[#131b2e]" htmlFor="task-instructions">
-                What should I ask or confirm?
+              <label className="text-sm font-semibold text-[#131b2e] flex items-center gap-1.5" htmlFor="task-instructions">
+                <span className="material-symbols-outlined text-primary text-[18px]">forum</span>
+                <span>What should I ask or confirm?</span>
               </label>
+              <span className="text-xs text-[#777587]">Natural conversational style</span>
             </div>
             <textarea
               id="task-instructions"
@@ -353,20 +353,79 @@ export default function NewCallDashboard() {
               rows={3}
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
-              placeholder="Enter what to talk (e.g. Ask if my laptop is ready for pickup)..."
+              placeholder="Type instructions (e.g. Call store and ask if laptop service order #4892 is ready for pickup today)..."
               className="w-full p-3.5 bg-[#f2f3ff] border border-[#eaedff] rounded-xl text-sm leading-relaxed text-[#131b2e] placeholder-[#777587] focus:bg-white focus:ring-2 focus:ring-primary-container/30 focus:border-primary-container outline-none transition resize-y min-h-[90px]"
             />
+            {/* Gentle Prompt Suggestions from Stitch Design */}
+            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+              <span className="text-xs text-[#777587] mr-1">Suggestions:</span>
+              <button
+                type="button"
+                onClick={() => setInstructions('Call the store and ask if my laptop service order #4892 is ready for pickup today.')}
+                className="px-2.5 py-1 rounded-full bg-[#f2f3ff] hover:bg-[#e2dfff] text-[#464555] hover:text-primary text-xs font-medium transition cursor-pointer border border-[#eaedff]"
+              >
+                Service status
+              </button>
+              <button
+                type="button"
+                onClick={() => setInstructions('Call the clinic and confirm my 5:30 PM appointment slot with the doctor.')}
+                className="px-2.5 py-1 rounded-full bg-[#f2f3ff] hover:bg-[#e2dfff] text-[#464555] hover:text-primary text-xs font-medium transition cursor-pointer border border-[#eaedff]"
+              >
+                Confirm appointment
+              </button>
+              <button
+                type="button"
+                onClick={() => setInstructions('Call the merchant and inquire about today\'s store closing hours.')}
+                className="px-2.5 py-1 rounded-full bg-[#f2f3ff] hover:bg-[#e2dfff] text-[#464555] hover:text-primary text-xs font-medium transition cursor-pointer border border-[#eaedff]"
+              >
+                Store hours
+              </button>
+            </div>
+          </div>
+
+          {/* Schedule Call Option */}
+          <div className="p-3.5 rounded-xl bg-[#f2f3ff]/60 border border-[#eaedff] space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <label className="text-sm font-semibold text-[#131b2e] flex items-center gap-1.5" htmlFor="schedule-time">
+                  <span className="material-symbols-outlined text-primary text-[18px]">schedule</span>
+                  <span>Schedule Call for Later (Optional)</span>
+                </label>
+                <p className="text-xs text-[#464555] mt-0.5">Leave blank to make the call immediately, or set a future date and time.</p>
+              </div>
+              <input
+                id="schedule-time"
+                type="datetime-local"
+                value={scheduleTime}
+                onChange={(e) => setScheduleTime(e.target.value)}
+                min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
+                className="w-full sm:w-auto min-h-[40px] px-3 bg-white border border-[#c7c4d8] rounded-xl text-xs font-medium text-[#131b2e] focus:ring-2 focus:ring-primary-container/30 outline-none transition cursor-pointer"
+              />
+            </div>
+            {scheduleTime && (
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#eaedff] text-xs">
+                <span className="flex items-center gap-1 text-emerald-700 font-semibold">
+                  <span className="material-symbols-outlined text-sm">event_available</span>
+                  <span>Will trigger at {new Date(scheduleTime).toLocaleString()}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setScheduleTime('')}
+                  className="text-xs text-rose-600 hover:underline font-semibold cursor-pointer"
+                >
+                  Clear schedule
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Language Selector */}
           <div>
             <label className="block text-sm font-semibold text-[#131b2e] mb-2">Language</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1.5 bg-[#f2f3ff] border border-[#eaedff] rounded-xl">
+            <div className="grid grid-cols-2 gap-2 p-1.5 bg-[#f2f3ff] border border-[#eaedff] rounded-xl">
               {[
-                { id: 'auto', label: 'Auto' },
-                { id: 'kannada', label: 'ಕನ್ನಡ' },
-                { id: 'english', label: 'English' },
-                { id: 'kanglish', label: 'Kanglish' },
+                { id: 'english', label: 'Conversational English' },
+                { id: 'auto', label: 'Natural English (Auto)' },
               ].map((lang) => (
                 <button
                   key={lang.id}
@@ -390,7 +449,7 @@ export default function NewCallDashboard() {
               <label className="text-sm font-semibold text-[#131b2e]">Voice Selection</label>
               <span className="text-xs text-[#777587]">Click play to listen</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Voice 1 */}
               <div
                 onClick={() => setVoiceProfile('aarohi')}
@@ -446,16 +505,6 @@ export default function NewCallDashboard() {
                   </span>
                 </button>
               </div>
-
-              {/* Voice 3: Add / Manage in Studio */}
-              <button
-                type="button"
-                onClick={() => router.push('/voice-studio/settings')}
-                className="min-h-[56px] flex items-center justify-center gap-1.5 p-3.5 rounded-xl border border-dashed border-[#c7c4d8] hover:border-primary-container hover:bg-[#f2f3ff] text-primary text-xs sm:text-sm font-semibold transition text-center cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[18px]">record_voice_over</span>
-                <span>Voice Studio</span>
-              </button>
             </div>
           </div>
 
@@ -475,8 +524,8 @@ export default function NewCallDashboard() {
             </label>
           </div>
 
-          {/* Main Action Button */}
-          <div className="pt-2">
+          {/* Main Action Buttons */}
+          <div className="pt-2 space-y-3">
             <button
               type="submit"
               disabled={loading}
@@ -490,10 +539,21 @@ export default function NewCallDashboard() {
               ) : (
                 <>
                   <span className="material-symbols-outlined text-[20px]">call</span>
-                  <span>Make Call as {callerName} (ಕರೆ ಮಾಡಿ)</span>
+                  <span>Make Call as {callerName}</span>
                 </>
               )}
             </button>
+
+            {/* Secondary Feature Link to Call Message Setup */}
+            <div className="pt-2 text-center">
+              <Link
+                href="/dashboard/message"
+                className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-primary hover:text-primary-container transition py-1 px-3 rounded-lg hover:bg-[#f2f3ff]"
+              >
+                <span className="material-symbols-outlined text-[18px]">chat</span>
+                <span>Want to send a call message invitation instead? Go to Call Message Setup &rarr;</span>
+              </Link>
+            </div>
           </div>
         </form>
       </div>

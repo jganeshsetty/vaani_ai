@@ -6,7 +6,7 @@ interface Props {
 
 export function LanguageBadge({ language }: Props) {
   const configs: Record<string, { label: string; class: string }> = {
-    kannada: { label: 'ಕನ್ನಡ', class: 'badge-kannada' },
+    kannada: { label: 'Kannada', class: 'badge-kannada' },
     english: { label: 'English', class: 'badge-english' },
     kanglish: { label: 'Kanglish', class: 'badge-kanglish' },
   };

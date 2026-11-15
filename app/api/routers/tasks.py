@@ -39,7 +39,7 @@ async def get_task(task_id: str) -> TaskOut:
 
 
 # Note: Legacy /api/calls/start endpoint removed.
-# Use POST /api/create-outbound-call in call_sessions.py instead.
+# Use POST /api/outbound in call_sessions.py instead.
 # This endpoint created tasks and triggered Exotel calls, which is no longer used.
 
 

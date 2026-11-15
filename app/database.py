@@ -151,20 +151,28 @@ async def connect_to_mongo() -> None:
     try:
         _client = AsyncIOMotorClient(
             settings.mongodb_uri,
-            serverSelectionTimeoutMS=2000,
-            connectTimeoutMS=2000,
-            socketTimeoutMS=2000,
+            serverSelectionTimeoutMS=2500,
+            connectTimeoutMS=2500,
         )
         _db = _client[settings.mongodb_db]
-        # Verify connectivity with strict timeout
-        await asyncio.wait_for(_client.admin.command("ping"), timeout=2.0)
+        await asyncio.wait_for(_client.admin.command("ping"), timeout=2.5)
         _is_mock = False
-        logger.info("Connected to MongoDB at %s (%s)", settings.mongodb_uri, settings.mongodb_db)
+        logger.info("Connected to Primary MongoDB (%s)", settings.mongodb_db)
+        return
     except Exception as exc:
-        logger.warning(
-            "Could not connect to MongoDB (%s). Activating resilient In-Memory DB for zero-config cloud deployment.",
-            exc,
-        )
+        logger.warning("Primary MongoDB connection note: %s. Checking local fallback...", exc)
+        try:
+            local_client = AsyncIOMotorClient("mongodb://localhost:27017", serverSelectionTimeoutMS=1500)
+            await asyncio.wait_for(local_client.admin.command("ping"), timeout=1.5)
+            _client = local_client
+            _db = _client[settings.mongodb_db]
+            _is_mock = False
+            logger.info("Connected to Local MongoDB (localhost:27017)")
+            return
+        except Exception:
+            pass
+
+        logger.info("Activating resilient In-Memory DB for zero-config operation.")
         _db = InMemoryDatabase()
         _is_mock = True
 

@@ -16,7 +16,7 @@ function CallDetailsContent() {
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [translationMode, setTranslationMode] = useState<'both' | 'kannada' | 'english'>('both');
+  const [translationMode, setTranslationMode] = useState<'english' | 'both'>('english');
   const [callerName, setCallerName] = useState('Ganesh');
 
   useEffect(() => {
@@ -104,38 +104,9 @@ ${transcriptTurns.map((t) => `${t.speaker}: "${t.kannada}" (${t.english})`).join
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleWhatsAppShare = () => {
-    const rawNumber = targetPhone || '';
-    const cleanNumber = rawNumber.replace(/[^0-9]/g, '');
-    const siteUrl = typeof window !== 'undefined' ? window.location.origin : 'https://vaani.pages.dev';
-    const message = `Call Summary from Vaani AI:\n- Recipient: ${recipientName}\n- Outcome: ${summaryText}\n\nVisit our website: ${siteUrl}`;
-
-    const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL;
-    if (webhookUrl && cleanNumber) {
-      try {
-        fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            mode: 'outbound',
-            phone: cleanNumber,
-            link: siteUrl,
-            message: message,
-          }),
-        }).catch(() => {});
-      } catch {}
-    }
-
-    const waUrl = cleanNumber
-      ? `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`
-      : `https://wa.me/?text=${encodeURIComponent(message)}`;
-    if (typeof window !== 'undefined') {
-      window.open(waUrl, '_blank', 'noopener,noreferrer');
-    }
-  };
 
   const cycleTranslation = () => {
-    setTranslationMode((prev) => (prev === 'both' ? 'kannada' : prev === 'kannada' ? 'english' : 'both'));
+    setTranslationMode((prev) => (prev === 'english' ? 'both' : 'english'));
   };
 
   const handleAudioPlayback = () => {
@@ -237,14 +208,6 @@ ${transcriptTurns.map((t) => `${t.speaker}: "${t.kannada}" (${t.english})`).join
               <span>{copied ? 'Copied' : 'Copy Summary'}</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleWhatsAppShare}
-              className="min-h-[44px] px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-xs sm:text-sm font-semibold text-emerald-800 border border-emerald-300 flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-            >
-              <span className="material-symbols-outlined text-base text-emerald-600">chat</span>
-              <span>Send via WhatsApp</span>
-            </button>
           </div>
         </div>
 
@@ -279,11 +242,9 @@ ${transcriptTurns.map((t) => `${t.speaker}: "${t.kannada}" (${t.english})`).join
           >
             <span className="material-symbols-outlined text-[15px]">translate</span>
             <span>
-              {translationMode === 'both'
-                ? 'Subtitles: Dual (ಕನ್ನಡ + Eng)'
-                : translationMode === 'kannada'
-                ? 'Subtitles: ಕನ್ನಡ ಮಾತ್ರ'
-                : 'Subtitles: English Only'}
+              {translationMode === 'english'
+                ? 'Transcript: English'
+                : 'Transcript: Full Dialogue'}
             </span>
           </button>
         </div>
@@ -323,20 +284,21 @@ ${transcriptTurns.map((t) => `${t.speaker}: "${t.kannada}" (${t.english})`).join
                   >
                     <div className="text-[11px] font-semibold opacity-85">{turn.speaker}</div>
 
-                    {(translationMode === 'both' || translationMode === 'kannada') && (
-                      <p className="font-medium leading-relaxed">{turn.kannada}</p>
-                    )}
-
-                    {(translationMode === 'both' || translationMode === 'english') && (
-                      <p
-                        className={`text-[12px] leading-relaxed pt-0.5 border-t ${
-                          isCaller
-                            ? 'text-white/80 border-white/20'
-                            : 'text-[#464555] border-[#eaedff]'
-                        }`}
-                      >
-                        {turn.english}
-                      </p>
+                    {translationMode === 'both' ? (
+                      <>
+                        <p className="font-medium leading-relaxed">{turn.kannada}</p>
+                        <p
+                          className={`text-[12px] leading-relaxed pt-0.5 border-t ${
+                            isCaller
+                              ? 'text-white/80 border-white/20'
+                              : 'text-[#464555] border-[#eaedff]'
+                          }`}
+                        >
+                          {turn.english}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="font-medium leading-relaxed">{turn.english || turn.kannada}</p>
                     )}
                   </div>
                 </div>

@@ -45,7 +45,7 @@ export default function CallHistoryPage() {
               number: s.target_number || 'Telephony Line',
               date: formattedDate,
               duration: '1m 15s',
-              language: s.language === 'kannada' ? 'ಕನ್ನಡ' : s.language || 'ಕನ್ನಡ',
+              language: s.language || 'English',
               status: s.status === 'completed' ? 'completed' : s.status === 'failed' ? 'missed' : s.status === 'in_progress' ? 'attention' : 'pending',
               summary: s.summary || 'Call session completed.',
             };
@@ -192,13 +192,13 @@ export default function CallHistoryPage() {
                   {item.status === 'completed' ? 'Completed' : item.status === 'missed' ? 'Missed' : 'Pending'}
                 </span>
 
-                <button
-                  type="button"
-                  className="px-3.5 py-1.5 rounded-xl border border-[#e2e7ff] text-xs font-semibold text-[#464555] hover:bg-[#f2f3ff] hover:text-[#131b2e] transition flex items-center gap-1"
+                <Link
+                  href={`/summary/${item.id}`}
+                  className="px-3.5 py-1.5 rounded-xl border border-[#e2e7ff] text-xs font-semibold text-[#464555] hover:bg-[#f2f3ff] hover:text-[#131b2e] transition flex items-center gap-1 cursor-pointer"
                 >
                   <span>Details</span>
                   <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-                </button>
+                </Link>
               </div>
             </div>
           ))

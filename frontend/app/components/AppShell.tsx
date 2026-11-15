@@ -25,10 +25,9 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   const isDashboard = pathname === '/dashboard' || pathname === '/new-call';
+  const isMessage = pathname === '/dashboard/message';
   const isLiveCall = pathname === '/dashboard/live' || pathname === '/call/live';
   const isHistory = pathname === '/call/history' || pathname === '/dashboard/history';
-  const isDetails = pathname?.startsWith('/call/') && !isLiveCall && !isHistory;
-  const isStudio = pathname?.startsWith('/voice-studio');
 
   const initials =
     callerName
@@ -64,7 +63,19 @@ export function AppShell({ children }: AppShellProps) {
             }`}
           >
             <span className="material-symbols-outlined text-[20px]">add_call</span>
-            <span>New Call</span>
+            <span>Manual Call</span>
+          </Link>
+
+          <Link
+            href="/dashboard/message"
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] min-h-[44px] transition-all ${
+              isMessage
+                ? 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200/60 shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[20px]">chat</span>
+            <span>Call Message Setup</span>
           </Link>
 
           <Link
@@ -109,30 +120,6 @@ export function AppShell({ children }: AppShellProps) {
             <span className="material-symbols-outlined text-[20px]">history</span>
             <span>Call History</span>
           </Link>
-
-          <Link
-            href="/call/details"
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] min-h-[44px] transition-all ${
-              isDetails
-                ? 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200/60 shadow-xs'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[20px]">description</span>
-            <span>Call Details</span>
-          </Link>
-
-          <Link
-            href="/voice-studio/settings"
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[14px] min-h-[44px] transition-all ${
-              isStudio
-                ? 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200/60 shadow-xs'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[20px]">tune</span>
-            <span>Voice Studio</span>
-          </Link>
         </nav>
 
         {/* Engine status pill */}
@@ -140,8 +127,8 @@ export function AppShell({ children }: AppShellProps) {
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-2.5">
             <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse shrink-0" />
             <div className="flex flex-col min-w-0">
-              <span className="text-[12px] font-semibold text-slate-800 leading-tight">Kannada Voice Engine</span>
-              <span className="text-[10.5px] text-slate-500 truncate">Casual & Informal Mode</span>
+              <span className="text-[12px] font-semibold text-slate-800 leading-tight">AI Voice Assistant</span>
+              <span className="text-[10.5px] text-slate-500 truncate">Online &amp; Ready</span>
             </div>
           </div>
         </div>
@@ -176,32 +163,46 @@ export function AppShell({ children }: AppShellProps) {
       {/* Main View Area */}
       <div className="md:pl-64 flex flex-col min-h-screen bg-[#faf8ff]">
         {/* Top Header */}
-        <header className="h-16 px-4 md:px-8 bg-white/90 backdrop-blur sticky top-0 z-40 flex items-center justify-between border-b border-slate-200/80 shadow-xs">
-          <div className="flex items-center gap-3">
+        <header className="h-16 px-4 md:px-8 bg-white/90 backdrop-blur sticky top-0 z-40 flex items-center justify-between border-b border-slate-200/80 shadow-xs gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             {/* Mobile Logo */}
-            <Link href="/dashboard" className="md:hidden flex items-center gap-2">
+            <Link href="/dashboard" className="md:hidden flex items-center gap-2 shrink-0">
               <div className="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center text-white">
                 <span className="material-symbols-outlined text-[18px]">phone_in_talk</span>
               </div>
-              <span className="font-bold text-[16px] text-slate-900">VaaniCall</span>
+              <span className="font-bold text-[15px] text-slate-900">Vaani</span>
             </Link>
 
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
-              <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-              {isLiveCall ? 'Live Call In Progress' : 'Ready to assist'}
-            </span>
+            {/* Top Navigation 2 Pages Switcher according to design */}
+            <div className="flex items-center gap-1 p-1 bg-[#f2f3ff] rounded-xl border border-[#eaedff]">
+              <Link
+                href="/dashboard"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  isDashboard || isLiveCall
+                    ? 'bg-white text-primary shadow-xs border border-[#dae2fd]'
+                    : 'text-[#464555] hover:text-[#131b2e]'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">add_call</span>
+                <span className="hidden sm:inline">1. Manual Calling</span>
+                <span className="sm:hidden">1. Call</span>
+              </Link>
+              <Link
+                href="/dashboard/message"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  isMessage
+                    ? 'bg-white text-primary shadow-xs border border-[#dae2fd]'
+                    : 'text-[#464555] hover:text-[#131b2e]'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">chat</span>
+                <span className="hidden sm:inline">2. Call Message Setup</span>
+                <span className="sm:hidden">2. Message</span>
+              </Link>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-[13px] text-slate-700 shadow-xs">
-              <span className="material-symbols-outlined text-[16px] text-indigo-600">translate</span>
-              <span className="font-semibold text-slate-900">ಕನ್ನಡ</span>
-              <span className="text-slate-300">|</span>
-              <span>English</span>
-            </div>
-
-            <div className="h-4 w-px bg-slate-200 hidden sm:block" />
-
             <div className="flex items-center gap-2">
               <div className="text-right hidden sm:block">
                 <div className="text-xs font-semibold text-slate-900 leading-tight">{callerName}</div>
@@ -227,7 +228,16 @@ export function AppShell({ children }: AppShellProps) {
           }`}
         >
           <span className="material-symbols-outlined text-xl">add_call</span>
-          <span className="text-[11px] font-medium">New</span>
+          <span className="text-[11px] font-medium">Call</span>
+        </Link>
+        <Link
+          href="/dashboard/message"
+          className={`min-h-[48px] min-w-[54px] flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-lg transition-colors ${
+            isMessage ? 'text-indigo-600 font-bold' : 'text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          <span className="material-symbols-outlined text-xl">chat</span>
+          <span className="text-[11px] font-medium">Message</span>
         </Link>
         <Link
           href="/dashboard/live"
@@ -251,24 +261,6 @@ export function AppShell({ children }: AppShellProps) {
         >
           <span className="material-symbols-outlined text-xl">history</span>
           <span className="text-[11px] font-medium">History</span>
-        </Link>
-        <Link
-          href="/call/details"
-          className={`min-h-[48px] min-w-[54px] flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-lg transition-colors ${
-            isDetails ? 'text-indigo-600 font-bold' : 'text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          <span className="material-symbols-outlined text-xl">description</span>
-          <span className="text-[11px] font-medium">Details</span>
-        </Link>
-        <Link
-          href="/voice-studio/settings"
-          className={`min-h-[48px] min-w-[54px] flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-lg transition-colors ${
-            isStudio ? 'text-indigo-600 font-bold' : 'text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          <span className="material-symbols-outlined text-xl">tune</span>
-          <span className="text-[11px] font-medium">Studio</span>
         </Link>
       </nav>
     </div>

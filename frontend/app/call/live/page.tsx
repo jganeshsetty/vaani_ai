@@ -110,7 +110,7 @@ function LiveCallContent() {
       }
     }
     setTimeout(() => {
-      router.push(callId ? `/call/details?id=${callId}` : '/call/history');
+      router.push('/call/history');
     }, 400);
   };
 
@@ -125,7 +125,7 @@ function LiveCallContent() {
           <div className="space-y-1.5">
             <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Call Could Not Connect</h2>
             <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto">
-              {call?.summary || 'The telecom provider rejected this outbound call request.'}
+              {call?.summary || 'The web call session could not start.'}
             </p>
           </div>
 
@@ -135,7 +135,7 @@ function LiveCallContent() {
               <span>Why did this happen?</span>
             </p>
             <p className="text-slate-600 leading-relaxed">
-              Call sessions are set up through the secure backend session system. If this message appears, the session may still be initializing, or the telecom provider rejected the connection request. Check that the session was created via the dashboard.
+              Call sessions are handled through the secure backend web calling system. If this message appears, the session may still be initializing, or the web call could not connect. Check that the session was created via the dashboard.
             </p>
           </div>
 
@@ -150,10 +150,10 @@ function LiveCallContent() {
             </button>
             <button
               type="button"
-              onClick={() => router.push(callId ? `/call/details?id=${callId}` : '/call/history')}
+              onClick={() => router.push('/call/history')}
               className="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition cursor-pointer"
             >
-              View Record
+              View Call History
             </button>
           </div>
         </div>
@@ -233,7 +233,7 @@ function LiveCallContent() {
           </div>
           <div className="flex justify-between items-center">
             <span className="font-semibold text-[#131b2e]">Telephony Line:</span>
-            <span className="font-mono text-[#777587]">ExoPhone (08047290621)</span>
+            <span className="font-mono text-[#777587]">Web Voice Channel</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="font-semibold text-[#131b2e]">Audio Stream:</span>
@@ -249,7 +249,7 @@ function LiveCallContent() {
             className="w-full min-h-[52px] px-6 py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white text-sm sm:text-base font-bold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition cursor-pointer"
           >
             <span className="material-symbols-outlined text-2xl">call_end</span>
-            <span>End Call &amp; View Summary (ಕರೆ ಮುಗಿಸಿ)</span>
+            <span>End Call &amp; View Summary</span>
           </button>
         </div>
       </div>

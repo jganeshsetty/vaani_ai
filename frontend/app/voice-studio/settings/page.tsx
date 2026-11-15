@@ -158,8 +158,8 @@ export default function VoiceStudioSettingsPage() {
       if ('speechSynthesis' in window) {
         const text =
           profile.id === 'sunil' || profile.isCustom
-            ? `ಹಲೋ, ನಮಸ್ತೆ! ನಾನು ${callerName}. ಆರಾಮಾಗಿದ್ದೀರಾ?`
-            : `ಹಲೋ, ನಮಸ್ಕಾರ! ನಾನು ಆರೋಹಿ. ನಿಮ್ಮ ಕೆಲಸವನ್ನು ನಾನು ಮಾತನಾಡುತ್ತೇನೆ.`;
+            ? `Hello! This is ${callerName}. How are you doing today?`
+            : `Hello, I am Aarohi. I am here to assist you with your request.`;
 
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.rate = speakingSpeed;
@@ -346,8 +346,8 @@ export default function VoiceStudioSettingsPage() {
 
             {/* Script Suggestion */}
             <div className="p-4 rounded-xl bg-[#faf9f6] border border-[#e2e1dd] text-xs sm:text-sm text-[#4d5550] leading-relaxed">
-              <span className="font-semibold text-[#1a1c1a] block mb-1">Suggested Kannada Recording Script:</span>
-              &ldquo;ಹಲೋ ನಮಸ್ಕಾರ, ನಾನು {callerName}. ನಾನು ಬೆಂಗಳೂರಿನಲ್ಲಿ ವಾಸವಾಗಿದ್ದೇನೆ. ನನಗೆ ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಲು ತುಂಬಾ ಇಷ್ಟ. ನನ್ನ ಎಲ್ಲಾ ಕಾಲ್‌ಗಳನ್ನು ನನ್ನ ಧ್ವನಿಯಲ್ಲೇ ಮಾಡಿ.&rdquo;
+              <span className="font-semibold text-[#1a1c1a] block mb-1">Suggested Voice Recording Script:</span>
+              &ldquo;Hello, this is {callerName}. I am setting up my personal voice profile so calls can be handled naturally in my own voice.&rdquo;
             </div>
 
             {/* Recording Controls */}
@@ -518,7 +518,7 @@ export default function VoiceStudioSettingsPage() {
                 >
                   <div className="font-bold">⚡ Informal &amp; Casual (Recommended)</div>
                   <div className="text-[11px] text-[#717973] mt-0.5">
-                    Speaks like a friend or customer: &ldquo;ಹೇ, ನಮಸ್ತೆ! ಸಣ್ಣ ವಿಷಯ ಕೇಳ್ಬೇಕಿತ್ತು...&rdquo;
+                    Speaks like a friend or customer: &ldquo;Hey there! Just wanted to quickly check on something...&rdquo;
                   </div>
                 </button>
 
@@ -533,7 +533,7 @@ export default function VoiceStudioSettingsPage() {
                 >
                   <div className="font-bold">Formal / Corporate</div>
                   <div className="text-[11px] text-[#717973] mt-0.5">
-                    Polite, reserved tone: &ldquo;ನಮಸ್ಕಾರ, ನಾನು ಈ ವಿಷಯದ ಬಗ್ಗೆ ವಿಚಾರಿಸಲು ಕರೆ ಮಾಡಿದ್ದೇನೆ.&rdquo;
+                    Polite, reserved tone: &ldquo;Good day, I am calling to politely inquire regarding this matter.&rdquo;
                   </div>
                 </button>
               </div>

@@ -22,16 +22,6 @@ class Settings(BaseSettings):
     gnani_prisma_ws_url: str = "wss://api.vachana.ai/stt/v3/stream"
     gnani_timbre_ws_url: str = "wss://api.vachana.ai/api/v1/tts"
 
-    # --- Google Cloud Platform ---
-    gcp_project_id: str = ""
-    gcs_bucket_name: str = ""
-    google_application_credentials: str = ""
-
-    # --- Meta WhatsApp API ---
-    whatsapp_phone_number_id: str = ""
-    whatsapp_access_token: str = ""
-    whatsapp_api_base_url: str = "https://graph.facebook.com/v20.0"
-
     # --- Server ---
     host: str = "0.0.0.0"
     port: int = 8000

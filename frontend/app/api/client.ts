@@ -35,13 +35,13 @@ export function getApiBase(): string {
 }
 
 /** Get WebSocket URL for real-time voice session */
-export function getWsUrl(): string {
+export function getWsUrl(roomId?: string): string {
   const base = getApiBase();
   // Convert HTTP to HTTPS/WSS
   let wsBase = base.replace(/^http/, 'ws');
   // Remove /api suffix for WebSocket path
   wsBase = wsBase.replace(/\/api$/, '');
-  return `${wsBase}/ws`;
+  return roomId ? `${wsBase}/ws/${encodeURIComponent(roomId)}` : `${wsBase}/ws`;
 }
 
 export interface Task {
@@ -221,6 +221,33 @@ export async function createSession(data: {
     const err = await res.text();
     throw new Error(`Failed to create session: ${err}`);
   }
+  return res.json();
+}
+
+export async function createOutboundCall(data: {
+  target_name?: string;
+  target_number: string;
+  context_prompt: string;
+  schedule_time?: string | null;
+}): Promise<{ room_id: string; mode: string; status: string }> {
+  const base = getApiBase();
+  const res = await fetch(`${base}/outbound`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to create outbound call');
+  return res.json();
+}
+
+export async function generateBusySession(): Promise<{ room_id: string; mode: string; status: string }> {
+  const base = getApiBase();
+  const res = await fetch(`${base}/generate-busy-session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  if (!res.ok) throw new Error('Failed to generate busy session');
   return res.json();
 }
 

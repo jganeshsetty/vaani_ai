@@ -1,7 +1,7 @@
 """CallSession lifecycle service backed by MongoDB.
 
 A CallSession represents a dual-mode voice call:
-  - outbound: an AI agent initiates a conversation via WhatsApp Magic Link
+  - outbound: an AI agent initiates a conversation
   - inbound: a user configures a screening/busy-mode prompt
 
 Each session has a unique room_id (UUID) used as the WebSocket path.
@@ -33,10 +33,11 @@ def _serialize_session(doc: dict) -> CallSessionOut:
         status=CallStatus(doc.get("status", CallStatus.PENDING.value)),
         transcript=doc.get("transcript", []),
         summary=doc.get("summary"),
-        recording_url=doc.get("recording_url"),
+        scheduled_time=doc.get("scheduled_time"),
         language=Language(doc.get("language", Language.KANNADA.value)),
         created_at=doc["created_at"],
         updated_at=doc["updated_at"],
+        speaker_id=doc.get("speaker_id"),
     )
 
 
@@ -45,24 +46,29 @@ async def create_session(
     mode: CallMode = CallMode.OUTBOUND,
     target_number: Optional[str] = None,
     context_prompt: str,
-    language: Language = Language.KANNADA,
+    language: Language = Language.ENGLISH,
     target_name: Optional[str] = None,
+    scheduled_time: Optional[datetime] = None,
+    speaker_id: Optional[str] = None,
+    room_id: Optional[str] = None,
 ) -> CallSessionOut:
-    """Create a new CallSession with a fresh UUID room_id."""
+    """Create a new CallSession with a fresh UUID or specified room_id."""
     col: AsyncIOMotorCollection = call_sessions_collection()
-    room_id = str(uuid.uuid4())
+    session_room_id = room_id or str(uuid.uuid4())
     now = _now()
+    initial_status = CallStatus.SCHEDULED.value if scheduled_time and scheduled_time > now else CallStatus.PENDING.value
     doc = {
-        "room_id": room_id,
+        "room_id": session_room_id,
         "mode": mode.value,
         "target_number": target_number,
         "target_name": target_name,
         "context_prompt": context_prompt,
-        "status": CallStatus.PENDING.value,
+        "status": initial_status,
         "transcript": [],
         "summary": None,
-        "recording_url": None,
+        "scheduled_time": scheduled_time,
         "language": language.value,
+        "speaker_id": speaker_id,
         "created_at": now,
         "updated_at": now,
     }
@@ -137,18 +143,18 @@ async def set_call_summary(session_id: str, summary: str) -> None:
         )
 
 
-async def set_recording_url(session_id: str, url: str) -> None:
+async def set_scheduled_time(session_id: str, scheduled_time: Optional[datetime]) -> None:
     from bson import ObjectId
     col: AsyncIOMotorCollection = call_sessions_collection()
     try:
         await col.update_one(
             {"_id": ObjectId(session_id)},
-            {"$set": {"recording_url": url, "updated_at": _now()}},
+            {"$set": {"scheduled_time": scheduled_time, "updated_at": _now()}},
         )
     except Exception:
         await col.update_one(
             {"_id": session_id},
-            {"$set": {"recording_url": url, "updated_at": _now()}},
+            {"$set": {"scheduled_time": scheduled_time, "updated_at": _now()}},
         )
 
 

@@ -47,10 +47,12 @@ class GnaniTTSClient:
         api_key: Optional[str] = None,
         language: Language = Language.KANNADA,
         voice: str = "Aarohi",
+        speaker_id: Optional[str] = None,
     ) -> None:
         self.api_key = api_key or settings.gnani_api_key
         self.language = language
         self.voice = voice or "Aarohi"
+        self.speaker_id = speaker_id
 
     async def connect(self) -> None:
         """Connection hook for backwards compatibility."""
@@ -93,6 +95,8 @@ class GnaniTTSClient:
                 "sample_rate": 16000,
             },
         }
+        if self.speaker_id:
+            payload["speaker_id"] = self.speaker_id
 
         try:
             async with httpx.AsyncClient(timeout=20) as client:

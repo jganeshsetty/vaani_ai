@@ -66,22 +66,22 @@ class CallMode(str, Enum):
 
 
 class CallStatus(str, Enum):
-    INITIATED = "initiated"
-    IN_PROGRESS = "in_progress"
     PENDING = "pending"
+    SCHEDULED = "scheduled"
     ACTIVE = "active"
     COMPLETED = "completed"
     FAILED = "failed"
 
 
 class CallSessionCreate(BaseModel):
-    """Request body for POST /api/calls (create a call session)."""
+    """Request body for POST /api/outbound (create a call session)."""
 
     mode: CallMode = CallMode.OUTBOUND
     target_number: Optional[str] = None
     context_prompt: str = Field(..., min_length=1, max_length=2000)
     language: Language = Language.KANNADA
     target_name: Optional[str] = None
+    scheduled_time: Optional[datetime] = None
 
 
 class CallSessionOut(BaseModel):
@@ -96,10 +96,17 @@ class CallSessionOut(BaseModel):
     status: CallStatus = CallStatus.PENDING
     transcript: list[dict] = Field(default_factory=list)
     summary: Optional[str] = None
-    recording_url: Optional[str] = None
+    scheduled_time: Optional[datetime] = None
     language: Language = Language.KANNADA
     created_at: datetime
     updated_at: datetime
+    speaker_id: Optional[str] = None
+
+
+class SpeakerIdRequest(BaseModel):
+    """Speaker ID from Gnani voice cloning API."""
+    speaker_id: str = Field(..., description="Voice profile ID returned by Gnani")
+    name: Optional[str] = None
 
 
 class CallStartRequest(BaseModel):
@@ -115,7 +122,7 @@ class CallOut(BaseModel):
 
     id: str
     task_id: str
-    status: CallStatus = CallStatus.INITIATED
+    status: CallStatus = CallStatus.PENDING
     target_number: Optional[str] = None
     exotel_call_sid: Optional[str] = None
     exotel_media_sid: Optional[str] = None

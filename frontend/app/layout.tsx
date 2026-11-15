@@ -2,8 +2,8 @@ import './globals.css';
 import { AppShell } from './components/AppShell';
 
 export const metadata = {
-  title: 'VaaniCall AI — Autonomous Multilingual Voice Assistant',
-  description: 'Autonomous voice calling assistant in Kannada, English, and Kanglish',
+  title: 'Vaani AI — Autonomous Multilingual Voice Assistant',
+  description: 'Web-based autonomous AI voice assistant. Direct browser calling with no telephony required.',
 };
 
 export default function RootLayout({
