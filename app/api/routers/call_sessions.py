@@ -507,9 +507,9 @@ async def call_websocket(websocket: WebSocket, room_id: str):
         tone = getattr(session, "voice_tone", "natural")
 
         persona = (
-            f"You are {caller}'s autonomous personal voice assistant speaking directly with {recipient}. "
-            f"Maintain a {tone}, natural, polite conversational tone. "
-            f"Never break character. Keep responses concise (1-3 sentences) suitable for a live phone conversation."
+            f"You are {caller} speaking directly with {recipient} on a voice call. "
+            f"Maintain a {tone}, warm, authentic, natural human conversational tone. "
+            f"Speak in the first person. Keep responses concise (1-2 spoken sentences) like a real person on the phone."
         )
         system_prompt = f"{persona}\n\nCall Objective / Context:\n{session.context_prompt}"
 
@@ -581,7 +581,7 @@ async def call_websocket(websocket: WebSocket, room_id: str):
                 "type": "transcript",
                 "data": {
                     "role": "agent",
-                    "speaker": f"{caller}'s AI Agent",
+                    "speaker": caller,
                     "text": evon_response,
                     "language": session.language.value,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -590,7 +590,7 @@ async def call_websocket(websocket: WebSocket, room_id: str):
 
             a_entry = {
                 "role": "assistant",
-                "speaker": f"{caller}'s AI Agent",
+                "speaker": caller,
                 "text": evon_response,
                 "language": session.language.value,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -602,17 +602,17 @@ async def call_websocket(websocket: WebSocket, room_id: str):
 
         # Automatic initial greeting tailored to outbound objective vs inbound screening
         if session.mode == CallMode.INBOUND or room_id.startswith("p-"):
-            initial_greeting = f"Hello! You've reached {caller}'s personal voice assistant. {caller} is currently unavailable, but I'm here to speak with you and take down your message. How can I help you today?"
+            initial_greeting = f"Hey! It's {caller}. I'm tied up at the moment and couldn't pick up, but I can hear you—what's going on?"
         else:
             prompt_clean = session.context_prompt.strip().rstrip(".")
-            if len(prompt_clean) > 100:
-                prompt_clean = prompt_clean[:97] + "..."
-            initial_greeting = f"Hello {recipient}! This is {caller}'s personal AI assistant calling on their behalf. I'm reaching out regarding {prompt_clean}. Do you have a quick moment?"
+            if len(prompt_clean) > 85:
+                prompt_clean = prompt_clean[:82] + "..."
+            initial_greeting = f"Hey {recipient}! It's {caller}. Glad I caught you! Wanted to touch base real quick regarding {prompt_clean}—do you have a minute?"
         await websocket.send_json({
             "type": "transcript",
             "data": {
                 "role": "agent",
-                "speaker": f"{caller}'s AI Agent",
+                "speaker": caller,
                 "text": initial_greeting,
                 "language": session.language.value,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -621,7 +621,7 @@ async def call_websocket(websocket: WebSocket, room_id: str):
         conversation_history.append({"role": "assistant", "content": initial_greeting})
         g_entry = {
             "role": "assistant",
-            "speaker": f"{caller}'s AI Agent",
+            "speaker": caller,
             "text": initial_greeting,
             "language": session.language.value,
             "timestamp": datetime.now(timezone.utc).isoformat(),

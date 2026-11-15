@@ -319,11 +319,11 @@ function NativeDialerCallPage() {
       darkMode ? 'bg-[#060913] text-white' : 'bg-slate-100 text-slate-900'
     }`}>
       {/* Dialer Container with Native Phone Frame */}
-      <div className={`w-full max-w-sm sm:max-w-md rounded-[2.5rem] border backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col transition-colors duration-200 ${
+      <div className={`w-full max-w-[360px] sm:max-w-sm md:max-w-md rounded-[2rem] sm:rounded-[2.5rem] border backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col transition-colors duration-200 ${
         darkMode ? 'bg-slate-900/90 border-slate-800 shadow-slate-950/80' : 'bg-white/95 border-slate-200/90 shadow-slate-400/20'
       }`}>
         {/* Phone Top Status Bar */}
-        <div className="px-6 pt-4 pb-2 flex items-center justify-between text-xs font-semibold opacity-60">
+        <div className="px-5 sm:px-6 pt-3 sm:pt-4 pb-2 flex items-center justify-between text-xs font-semibold opacity-60">
           <span>VaaniCall HD Voice</span>
           <div className="flex items-center gap-2">
             <button
@@ -339,11 +339,11 @@ function NativeDialerCallPage() {
         </div>
 
         {/* Caller Header Card */}
-        <div className="pt-6 pb-4 px-6 flex flex-col items-center text-center space-y-3">
+        <div className="pt-4 sm:pt-6 pb-3 sm:pb-4 px-5 sm:px-6 flex flex-col items-center text-center space-y-2 sm:space-y-3">
           {/* Avatar with Animated Voice Waveform Pulse */}
           <div className="relative">
             <div
-              className={`w-24 h-24 rounded-full flex items-center justify-center text-3xl font-extrabold shadow-lg transition-all duration-300 ${
+              className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center text-2xl sm:text-3xl font-extrabold shadow-lg transition-all duration-300 ${
                 isAgentSpeaking
                   ? 'bg-gradient-to-tr from-emerald-500 to-teal-400 text-white scale-105 ring-4 ring-emerald-500/40 animate-pulse'
                   : 'bg-gradient-to-tr from-slate-700 to-slate-600 dark:from-slate-800 dark:to-slate-700 text-emerald-400'
@@ -360,7 +360,7 @@ function NativeDialerCallPage() {
           </div>
 
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">{callerName}</h2>
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight">{callerName}</h2>
             <p className="text-xs text-slate-400 font-mono mt-0.5">{phoneDisplay}</p>
           </div>
 
@@ -411,12 +411,12 @@ function NativeDialerCallPage() {
         )}
 
         {/* Live Conversation Transcript Drawer (Collapsible) */}
-        <div className="flex-1 px-4 sm:px-6 py-2 overflow-hidden flex flex-col min-h-[160px] max-h-[220px]">
+        <div className="flex-1 px-4 sm:px-6 py-2 overflow-hidden flex flex-col min-h-[120px] max-h-[180px] sm:min-h-[150px] sm:max-h-[210px]">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-400 mb-1.5">
             <span className="uppercase tracking-wider text-[10px]">Live Call Captions</span>
             <button
               onClick={() => setShowTranscript(!showTranscript)}
-              className="text-[11px] text-emerald-500 hover:underline"
+              className="text-[11px] text-emerald-500 hover:underline p-1 min-h-[32px] flex items-center"
             >
               {showTranscript ? 'Hide' : 'Show'}
             </button>
@@ -428,7 +428,7 @@ function NativeDialerCallPage() {
             }`}>
               {transcripts.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-center text-slate-400 text-xs py-4">
-                  <span>Listening... AI agent will speak upon connection.</span>
+                  <span>Listening... AI voice speaks upon connection.</span>
                 </div>
               ) : (
                 transcripts.map((t, idx) => (
@@ -459,13 +459,13 @@ function NativeDialerCallPage() {
 
         {/* Quick Text Response Input (For Noisy Environments) */}
         {callState === 'connected' && (
-          <form onSubmit={handleSendText} className="px-6 py-2 flex items-center gap-2">
+          <form onSubmit={handleSendText} className="px-4 sm:px-6 py-2 flex items-center gap-2">
             <input
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Type message to agent..."
-              className={`flex-1 px-3.5 py-2 rounded-xl text-xs border focus:outline-none transition-colors ${
+              placeholder="Type message to speaker..."
+              className={`flex-1 px-3.5 py-2 rounded-xl text-base sm:text-xs border focus:outline-none transition-colors min-h-[40px] ${
                 darkMode
                   ? 'bg-slate-950/80 border-slate-800 text-white placeholder-slate-500'
                   : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
@@ -474,7 +474,7 @@ function NativeDialerCallPage() {
             <button
               type="submit"
               disabled={!inputText.trim()}
-              className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-semibold transition-all"
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-semibold transition-all min-h-[40px]"
             >
               Send
             </button>
@@ -482,13 +482,13 @@ function NativeDialerCallPage() {
         )}
 
         {/* Native Phone Control Buttons Grid */}
-        <div className="p-6 pt-3 pb-8 space-y-4">
-          <div className="grid grid-cols-3 gap-4">
+        <div className="p-5 sm:p-6 pt-2 sm:pt-3 pb-6 sm:pb-8 space-y-3 sm:space-y-4">
+          <div className="grid grid-cols-3 gap-3 sm:gap-4">
             {/* Mute Button */}
             <div className="flex flex-col items-center gap-1.5">
               <button
                 onClick={handleToggleMute}
-                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-md active:scale-95 ${
+                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-md active:scale-95 ${
                   isMuted
                     ? 'bg-amber-500 text-white ring-4 ring-amber-500/30'
                     : darkMode
@@ -496,7 +496,7 @@ function NativeDialerCallPage() {
                     : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
                 }`}
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   {isMuted ? (
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
                   ) : (
@@ -511,7 +511,7 @@ function NativeDialerCallPage() {
             <div className="flex flex-col items-center gap-1.5">
               <button
                 onClick={() => setShowKeypad(!showKeypad)}
-                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-md active:scale-95 ${
+                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-md active:scale-95 ${
                   showKeypad
                     ? 'bg-emerald-600 text-white ring-4 ring-emerald-500/30'
                     : darkMode
@@ -519,7 +519,7 @@ function NativeDialerCallPage() {
                     : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
                 }`}
               >
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 2a2 2 0 100 4 2 2 0 000-4zM6 2a2 2 0 100 4 2 2 0 000-4zM18 2a2 2 0 100 4 2 2 0 000-4zM12 8a2 2 0 100 4 2 2 0 000-4zM6 8a2 2 0 100 4 2 2 0 000-4zM18 8a2 2 0 100 4 2 2 0 000-4zM12 14a2 2 0 100 4 2 2 0 000-4zM6 14a2 2 0 100 4 2 2 0 000-4zM18 14a2 2 0 100 4 2 2 0 000-4zM12 20a2 2 0 100 4 2 2 0 000-4z" />
                 </svg>
               </button>
@@ -530,7 +530,7 @@ function NativeDialerCallPage() {
             <div className="flex flex-col items-center gap-1.5">
               <button
                 onClick={() => setIsSpeakerOn(!isSpeakerOn)}
-                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-md active:scale-95 ${
+                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-md active:scale-95 ${
                   isSpeakerOn
                     ? 'bg-emerald-600 text-white ring-4 ring-emerald-500/30'
                     : darkMode
@@ -538,7 +538,7 @@ function NativeDialerCallPage() {
                     : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
                 }`}
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
                 </svg>
               </button>

@@ -37,12 +37,12 @@ def _extract_session_meta(messages: list[dict]) -> dict:
     tone = "natural"
     context = ""
 
-    # Parse: "You are {caller}'s autonomous personal voice assistant speaking directly with {recipient}."
-    m_caller = re.search(r"You are ([\w\s'-]+?)'s autonomous personal voice assistant", system_content, re.IGNORECASE)
+    # Parse: "You are {caller} speaking directly with {recipient}..." or "You are {caller}'s autonomous personal voice assistant..."
+    m_caller = re.search(r"You are ([\w\s'-]+?)(?:'s autonomous personal voice assistant|\s+speaking directly with)", system_content, re.IGNORECASE)
     if m_caller:
         caller = m_caller.group(1).strip()
 
-    m_recipient = re.search(r"speaking directly with ([\w\s'-]+?)\.", system_content, re.IGNORECASE)
+    m_recipient = re.search(r"speaking directly with ([\w\s'-]+?)(?:\s+on|\.|$)", system_content, re.IGNORECASE)
     if m_recipient:
         recipient = m_recipient.group(1).strip()
 
@@ -66,8 +66,9 @@ def _extract_session_meta(messages: list[dict]) -> dict:
 
 def _generate_human_dialogue(messages: list[dict]) -> str:
     """
-    Intelligent, context-aware dialogue generator that represents the caller
-    with human-like conversational realism, emotional pacing, and situational memory.
+    Lifelike human conversational dialogue generator.
+    Converses directly and naturally in first person as the caller, using authentic
+    spoken rhythms, everyday phrasing, active listening, and situational memory.
     """
     meta = _extract_session_meta(messages)
     caller = meta["caller"]
@@ -80,8 +81,8 @@ def _generate_human_dialogue(messages: list[dict]) -> str:
 
     if not user_turns:
         if context:
-            return f"Hello {recipient}! This is {caller}'s AI voice assistant. I'm reaching out regarding: {context}. Do you have a quick moment to speak?"
-        return f"Hello {recipient}! This is {caller}'s personal voice assistant. How are you doing today?"
+            return f"Hey {recipient}! It's {caller}. Glad I caught you! Wanted to touch base real quick about {context}—do you have a quick minute?"
+        return f"Hey {recipient}! It's {caller}. How's everything going with you today?"
 
     last_user_msg = user_turns[-1].strip()
     msg_lower = last_user_msg.lower()
@@ -89,54 +90,59 @@ def _generate_human_dialogue(messages: list[dict]) -> str:
 
     # 1. Farewells and Endings
     if any(re.search(r"\b" + re.escape(w) + r"\b", msg_lower) for w in ["bye", "goodbye", "talk later", "talk soon", "see ya", "see you", "have a good day", "have a great day"]):
-        return f"Thank you so much for your time, {recipient}! I've recorded everything we discussed and will share these notes with {caller} right away. Have a wonderful day, goodbye!"
+        return f"Awesome, thanks so much for your time, {recipient}! Really appreciate you talking through this. Talk to you soon, take care!"
 
     if any(re.search(r"\b" + re.escape(w) + r"\b", msg_lower) for w in ["thank you", "thanks", "that's all", "that is all", "nothing else"]):
-        return f"You're very welcome! I'll make sure {caller} gets all the details from our conversation. Thanks for taking the time to speak with me today!"
+        return f"You're very welcome, {recipient}! Really glad we connected. I'll follow up on everything we talked about. Have a great rest of your day!"
 
     # 2. Audio Check & Connection Confirmations
     if any(phrase in msg_lower for phrase in ["can you hear me", "are you there", "am i audible", "hear me"]):
-        return f"Yes, {recipient}! I can hear you clearly and distinctly. Go right ahead, I'm listening."
+        return f"Yeah {recipient}, I hear you loud and clear! Go right ahead."
 
     # 3. Identity Inquiries ("Who is this?", "Who are you?", "Who am I talking to?")
     if any(phrase in msg_lower for phrase in ["who is this", "who are you", "who am i speaking", "who is calling", "who's this"]):
-        intro = f"I'm {caller}'s autonomous personal voice assistant, speaking directly on their behalf."
         if context:
-            return f"{intro} {caller} asked me to connect with you regarding: {context}. Does that sound familiar?"
-        return f"{intro} How can I help you today?"
+            return f"Hey, it's {caller}! Reaching out directly about {context}. Did you get a chance to see that?"
+        return f"Hey, it's {caller}! What's going on with you today?"
 
     # 4. Inquiries About Purpose / Reason For Call ("Why are you calling?", "What is this about?")
     if any(phrase in msg_lower for phrase in ["what is this about", "what's this about", "why are you calling", "what's the reason", "what do you want", "tell me more", "what update", "what status"]):
         if context:
-            return f"{caller} asked me to reach out directly to discuss this: {context}. What are your thoughts on this?"
-        return f"I'm reaching out on behalf of {caller} to touch base with you. Is there anything specific you would like me to discuss or take down for them?"
+            return f"Yeah! Wanted to quickly catch up with you about {context}. How are things looking on your side?"
+        return f"Just wanted to touch base and see how everything is going on your end. Anything new?"
 
-    # 5. Message Taking / Relaying ("Tell him...", "Tell her...", "Please let them know...")
-    relay_match = re.search(r"\b(?:tell|let|inform|convey to|pass to)\s+(?:him|her|them|" + re.escape(caller.lower()) + r")\s+(?:that\s+)?(.+)", msg_lower)
+    # 5. Message Taking / Relaying ("Tell him...", "Tell her...", "Please let them know...", "Note that...")
+    relay_match = re.search(r"\b(?:tell|let|inform|convey to|pass to|remind)\s+(?:him|her|them|" + re.escape(caller.lower()) + r")\s+(?:that\s+)?(.+)", msg_lower)
     if relay_match:
-        relayed_text = relay_match.group(1).strip()
-        return f"Got it, I've made an exact note: '{relayed_text}'. I will ensure {caller} reads this right after we hang up. Anything else?"
+        relayed_text = relay_match.group(1).strip().rstrip(".")
+        return f"Got it, absolutely! I've made a note of that: '{relayed_text}'. I'll take care of it right after this call. Anything else on your mind?"
 
     # 6. Scheduling, Dates, and Times ("Tomorrow at 4 PM", "Can we do Monday", etc.)
-    time_match = re.search(r"\b(\d{1,2}(?::\d{2})?\s*(?:am|pm)\b|\bat\s+\d{1,2}(?::\d{2})?\b|\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next week|morning|afternoon|evening))\b", msg_lower)
+    time_match = re.search(r'\b(\d{1,2}(?::\d{2})?\s*(?:am|pm)(?:\s+tomorrow|\s+today)?|\b(?:tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?|\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next week|morning|afternoon|evening))\b', msg_lower)
     is_scheduling_intent = bool(time_match) or any(w in msg_lower for w in ["schedule", "reschedule", "meet", "meeting", "call at", "available at", "free at"])
 
     if is_scheduling_intent:
-        time_phrase = time_match.group(1).title() if time_match else "that proposed time"
+        raw_phrase = time_match.group(1).strip() if time_match else "that time"
+        if raw_phrase.lower().startswith("at "):
+            raw_phrase = raw_phrase[3:].strip()
+        time_phrase = " ".join(
+            w.upper() if w.lower() in ("am", "pm") else (w[:-2] + w[-2:].upper() if w.lower().endswith(("am", "pm")) and len(w) > 2 else w.capitalize())
+            for w in raw_phrase.split()
+        )
         if any(w in msg_lower for w in ["reschedule", "postpone", "move", "later", "can't make it", "busy then"]):
-            return f"Understood, we can definitely reschedule. I have noted {time_phrase} as your preferred time. I will confirm this with {caller} right away and have them send an invite."
-        return f"That sounds great! I've noted down {time_phrase} for {caller}. I'll lock that in on their calendar and make sure they are prepared. Does that work perfectly for you?"
+            return f"Yeah, no problem at all! {time_phrase} works much better for me too. I'll put it on my calendar right now and send over an invite."
+        return f"Yeah, {time_phrase} works great for me! I'll put it on my calendar right now. Does that time work best for you too?"
 
     # 7. Agreement & Positive Confirmations ("Yes", "Sure", "Sounds good", "Okay", "Agreed", "Confirmed")
     is_positive_agreement = any(re.search(r"\b" + re.escape(w) + r"\b", msg_lower) for w in ["yes", "yeah", "yep", "sure", "sounds good", "okay", "ok", "fine", "perfect", "done", "agreed", "confirmed", "absolutely", "definitely"])
     if is_positive_agreement:
         if turn_count <= 2 and context:
-            return f"Excellent! Regarding {context}, please let me know if you have any questions, or if everything is clear on your end."
-        return f"Wonderful, I've got that confirmed! I'm noting this down for {caller}. Is there anything else you'd like me to pass along to them?"
+            return f"Awesome, glad to hear that! Regarding {context}, do you have any quick questions or thoughts?"
+        return f"Awesome, really glad we're on the exact same page! Anything else you wanted to touch on before we wrap up?"
 
     # 8. Objections / Busy / Cannot Talk ("I'm busy", "Can't talk now", "Call back")
     if any(phrase in msg_lower for phrase in ["busy right now", "can't talk", "cannot talk", "call me back", "call later", "not a good time", "in a meeting"]):
-        return f"I completely understand, {recipient}! I won't hold you up. When would be a convenient time for {caller} or me to reach back out to you?"
+        return f"Oh totally understand, {recipient}! Don't want to hold you up at all. When's a good time for us to connect later?"
 
     # 9. Context & Keyword Matching from Call Objective
     if context:
@@ -144,21 +150,21 @@ def _generate_human_dialogue(messages: list[dict]) -> str:
         matching_words = [w for w in context_words if w in msg_lower]
         if matching_words:
             matched_topic = matching_words[0].capitalize()
-            return f"Regarding {matched_topic}, that is an important focus for {caller}. Everything is on track as outlined, and I'm capturing your feedback so {caller} has complete visibility. How does that sound?"
+            return f"Yeah, on {matched_topic}, that's coming along really well. We're right on track with it. What do you think?"
 
     # 10. General Inquiries or Questions from User
     if "?" in last_user_msg or any(msg_lower.startswith(w) for w in ["how", "what", "where", "when", "why", "which", "is", "are", "can", "could", "will"]):
-        return f"That's a great question. Based on our discussion for {caller}, I am documenting this specifically so {caller} can address that exact point for you. Let me know if there are any other details you'd like me to include."
+        return f"Good question! From my side, {context}. Let me double check that and get back to you with any updates. Does that sound good?"
 
-    # 11. Conversational Progression (Turn-sensitive natural responses)
+    # 11. Conversational Progression (Turn-sensitive natural human flow)
     if turn_count == 1:
         if context:
-            return f"Thanks for speaking with me, {recipient}! {caller} specifically asked me to touch base on: {context}. Does that align with what you were expecting?"
-        return f"Thanks for connecting, {recipient}! How can I help you regarding {caller} today?"
+            return f"Hey, thanks for chatting with me, {recipient}! Wanted to make sure we're aligned on: {context}. What's your take on that?"
+        return f"Hey, good catching up with you, {recipient}! How can I help you out today?"
     elif turn_count == 2:
-        return f"Understood! I've noted that down carefully. Is there any particular timeline or priority {caller} should keep in mind for this?"
+        return f"Makes total sense! I'll definitely keep that in mind. Any specific timing or details you want to add?"
     else:
-        return f"Thank you for sharing that with me, {recipient}. I have documented all these details for {caller}'s review. Is there anything else you'd like to add before we wrap up?"
+        return f"Sounds really good, {recipient}. I've got all of that down. Anything else we should cover before we jump off?"
 
 
 class EvonClient:

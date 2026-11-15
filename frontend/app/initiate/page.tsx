@@ -105,7 +105,7 @@ export default function InitiatePage() {
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   placeholder="e.g. +91 98765 43210"
                   required
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all min-h-[44px]"
                 />
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Include country code (e.g. +91)</p>
@@ -120,7 +120,7 @@ export default function InitiatePage() {
                 value={recipientName}
                 onChange={(e) => setRecipientName(e.target.value)}
                 placeholder="e.g. Alex Johnson"
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all min-h-[44px]"
               />
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Person the AI will address on call</p>
             </div>
@@ -137,7 +137,7 @@ export default function InitiatePage() {
                 value={callerName}
                 onChange={(e) => setCallerName(e.target.value)}
                 placeholder="e.g. Your Name"
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all min-h-[44px]"
               />
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">The agent speaks on your behalf</p>
             </div>
@@ -149,7 +149,7 @@ export default function InitiatePage() {
               <select
                 value={voiceTone}
                 onChange={(e: any) => setVoiceTone(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all min-h-[44px]"
               >
                 <option value="natural">Natural & Conversational</option>
                 <option value="professional">Professional & Direct</option>
@@ -176,7 +176,7 @@ export default function InitiatePage() {
               rows={4}
               required
               placeholder="Explain the reason for calling, questions to ask, and key points the AI must confirm..."
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all resize-y"
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all resize-y"
             ></textarea>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Example: &quot;Notify recipient about rescheduled demo tomorrow at 4 PM, confirm attendance, and ask if anyone else is joining.&quot;
@@ -240,16 +240,16 @@ export default function InitiatePage() {
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">
               Shareable Call Link
             </label>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <input
                 type="text"
                 readOnly
                 value={result.full_url}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-sm font-mono focus:outline-none"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs sm:text-sm font-mono focus:outline-none min-h-[44px]"
               />
               <button
                 onClick={() => copyToClipboard(result.full_url, false)}
-                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm min-h-[44px]"
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm min-h-[44px] flex-shrink-0"
               >
                 {copiedLink ? 'Copied!' : 'Copy Link'}
               </button>

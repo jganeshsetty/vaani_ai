@@ -120,7 +120,7 @@ export default function SetupPage() {
       </div>
 
       {/* 4-Step Instructions Guide */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
         {[
           {
             step: '1',
@@ -177,7 +177,7 @@ export default function SetupPage() {
                 onChange={(e) => setUserName(e.target.value)}
                 required
                 placeholder="e.g. Alex Johnson"
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all min-h-[44px]"
               />
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Used to personalize agent greetings</p>
             </div>
@@ -191,7 +191,7 @@ export default function SetupPage() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="e.g. +91 98765 43210"
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all min-h-[44px]"
               />
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Where callers normally reach you</p>
             </div>
@@ -207,7 +207,7 @@ export default function SetupPage() {
               value={persona}
               onChange={(e) => setPersona(e.target.value)}
               placeholder="e.g. Personal autonomous voice assistant representing me"
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all min-h-[44px]"
             />
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">How the AI describes its relationship to you</p>
           </div>
@@ -226,7 +226,7 @@ export default function SetupPage() {
               rows={4}
               required
               placeholder="Detail how you want the agent to converse with callers when you are busy..."
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all resize-y"
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all resize-y"
             ></textarea>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Example: &quot;Always greet callers warmly. If they ask about project status, assure them we are on track. Take note of any urgent messages.&quot;
@@ -242,7 +242,7 @@ export default function SetupPage() {
               <select
                 value={voiceId}
                 onChange={(e) => setVoiceId(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all min-h-[44px]"
               >
                 <option value="Aarohi">Aarohi (Natural Female Voice)</option>
                 <option value="Kabir">Kabir (Warm Male Voice)</option>
@@ -260,7 +260,7 @@ export default function SetupPage() {
                 value={speakerId}
                 onChange={(e) => setSpeakerId(e.target.value)}
                 placeholder="e.g. spk_gnani_custom_9812"
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all min-h-[44px]"
               />
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Used if you have a cloned voice profile</p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-3">Want a voice that sounds exactly like you? Create your custom voice clone.</p>
@@ -322,16 +322,16 @@ export default function SetupPage() {
         </div>
 
         {/* Permanent URL input */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <input
             type="text"
             readOnly
             value={permanentUrl}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700 text-emerald-300 text-sm font-mono focus:outline-none"
+            className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700 text-emerald-300 text-xs sm:text-sm font-mono focus:outline-none min-h-[44px]"
           />
           <button
             onClick={() => copyToClipboard(permanentUrl, false)}
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all min-h-[44px] flex items-center gap-1.5"
+            className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-semibold transition-all min-h-[44px] flex items-center justify-center gap-1.5 flex-shrink-0"
           >
             {copiedLink ? 'Copied!' : 'Copy Link'}
           </button>

@@ -96,7 +96,7 @@ export default function HomePage() {
       {/* Architecture Pipeline Summary Banner */}
       <div className="max-w-4xl mx-auto p-6 sm:p-8 rounded-3xl bg-slate-900 text-white shadow-lg space-y-4">
         <h3 className="text-lg font-bold">End-to-End Voice Orchestration</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 text-xs">
           <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700 space-y-1">
             <span className="font-bold text-emerald-400">1. Gnani STT</span>
             <p className="text-slate-300">Live 16kHz speech transcription with under 200ms processing.</p>
