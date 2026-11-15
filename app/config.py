@@ -1,7 +1,9 @@
 """Application configuration loaded from environment / .env file."""
 from __future__ import annotations
 
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 
 
 class Settings(BaseSettings):
@@ -35,6 +37,19 @@ class Settings(BaseSettings):
     max_call_turns: int = 4
     enable_tts_cache: bool = True
     concise_mode: bool = True
+
+    @model_validator(mode="after")
+    def populate_fallbacks(self) -> Settings:
+        """Allow variables with or without VAANI_ prefix."""
+        if not self.huggingface_api_key:
+            self.huggingface_api_key = os.environ.get("HUGGINGFACE_API_KEY") or os.environ.get("VAANI_HUGGINGFACE_API_KEY") or ""
+        if not self.gnani_api_key:
+            self.gnani_api_key = os.environ.get("GNANI_API_KEY") or os.environ.get("VAANI_GNANI_API_KEY") or ""
+        if self.mongodb_uri == "mongodb://localhost:27017":
+            env_uri = os.environ.get("MONGODB_URI") or os.environ.get("VAANI_MONGODB_URI")
+            if env_uri:
+                self.mongodb_uri = env_uri
+        return self
 
     @property
     def cors_origin_list(self) -> list[str]:
