@@ -8,77 +8,81 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        'primary': '#3525cd',
-        'primary-dark': '#281bb0',
-        'primary-container': '#4f46e5',
-        'primary-fixed': '#e2dfff',
-        'primary-fixed-dim': '#c3c0ff',
-        'on-primary': '#ffffff',
-        'on-primary-container': '#dad7ff',
-        'on-primary-fixed': '#0f0069',
-        'secondary': '#006591',
-        'secondary-container': '#39b8fd',
-        'secondary-fixed': '#c9e6ff',
-        'secondary-fixed-dim': '#89ceff',
-        'on-secondary': '#ffffff',
-        'on-secondary-container': '#004666',
-        'on-secondary-fixed': '#001e2f',
-        'on-secondary-fixed-variant': '#004c6e',
-        'tertiary': '#571ac0',
-        'tertiary-container': '#6f3dd9',
-        'tertiary-fixed': '#e9ddff',
-        'on-tertiary-container': '#e3d5ff',
-        'surface': '#faf8ff',
-        'surface-dim': '#d2d9f4',
-        'surface-bright': '#faf8ff',
-        'surface-container-lowest': '#ffffff',
-        'surface-container-low': '#f2f3ff',
-        'surface-container': '#eaedff',
-        'surface-container-high': '#e2e7ff',
-        'surface-container-highest': '#dae2fd',
-        'on-surface': '#131b2e',
-        'on-surface-variant': '#464555',
-        'outline': '#777587',
-        'outline-variant': '#c7c4d8',
-        'outline-light': '#e2e8f0',
-        'inverse-surface': '#283044',
-        'inverse-on-surface': '#eef0ff',
-        // Compatibility aliases to eradicate green completely
-        'sage': '#eff6ff',
-        'sage-light': '#f8fafc',
-        'sage-subtle': '#f1f5f9',
-        'sage-border': '#cbd5e1',
-        'warm-card': '#ffffff',
-        'terracotta': '#e11d48',
-        'terracotta-hover': '#be123c',
-        'terracotta-light': '#ffe4e6',
+        // Use Tailwind's built-in blue scale for primary (blue-50 through blue-950)
+        // primary = blue-600, primary-dark = blue-700, etc.
+
+        // Semantic Colors (using Tailwind's built-in scales with custom names)
+        'success': '#059669',        // Emerald-600
+        'success-light': '#10B981',  // Emerald-500
+        'warning': '#D97706',        // Amber-600
+        'warning-light': '#F59E0B',  // Amber-500
+        'error': '#DC2626',          // Red-600
+        'error-light': '#EF4444',    // Red-500
+
+        // Surface & Glassmorphism Tokens (custom)
+        'surface': '#F8FAFC',        // Slate-50 (light default)
+        'surface-elevated': '#FFFFFF',
+        'surface-dim': '#F1F5F9',    // Slate-100
+        'surface-card': '#FFFFFF',
+        'surface-border': '#E2E8F0', // Slate-200
+
+        // Dark Mode Surfaces (custom)
+        'surface-dark': '#0F172A',   // Slate-900
+        'surface-dark-elevated': '#1E293B', // Slate-800
+        'surface-dark-dim': '#1E293B',
+        'surface-dark-card': '#1E293B',
+        'surface-dark-border': '#334155', // Slate-700
+
+        // Text Colors (custom semantic names)
+        'text-primary': '#0F172A',   // Slate-900
+        'text-secondary': '#475569', // Slate-600
+        'text-muted': '#94A3B8',     // Slate-400
+        'text-inverse': '#F8FAFC',   // Slate-50
+        'text-dark-primary': '#F8FAFC',
+        'text-dark-secondary': '#CBD5E1', // Slate-300
+        'text-dark-muted': '#64748B', // Slate-500
+
+        // Glassmorphism Tokens (applied via utilities in globals.css)
+        'glass-light-bg': 'rgba(255, 255, 255, 0.8)',
+        'glass-light-border': 'rgba(226, 232, 240, 0.6)', // slate-200/60
+        'glass-dark-bg': 'rgba(30, 41, 59, 0.8)',         // slate-800/80
+        'glass-dark-border': 'rgba(51, 65, 85, 0.6)',     // slate-700/60
       },
       fontFamily: {
-        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
-        headline: ['Plus Jakarta Sans', 'sans-serif'],
-        body: ['Inter', 'sans-serif'],
+        sans: ['Plus Jakarta Sans', 'Inter', 'system-ui', 'sans-serif'],
+        headline: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        body: ['Inter', 'system-ui', 'sans-serif'],
       },
-      keyframes: {
-        'gentle-pulse': {
-          '0%, 100%': { transform: 'scale(1)', opacity: '0.9' },
-          '50%': { transform: 'scale(1.06)', opacity: '0.5' },
-        },
-        'gentle-wave': {
-          '0%, 100%': { height: '16px' },
-          '50%': { height: '38px' },
-        },
-      },
-      animation: {
-        'gentle-pulse': 'gentle-pulse 3s ease-in-out infinite',
-        'gentle-wave': 'gentle-wave 1.4s ease-in-out infinite',
+      backdropBlur: {
+        'xs': '2px',
+        'sm': '4px',
+        'md': '12px',
+        'lg': '16px',
+        'xl': '24px',
+        '2xl': '40px',
+        '3xl': '64px',
       },
       borderRadius: {
-        'DEFAULT': '0.375rem',
-        'lg': '0.5rem',
-        'xl': '0.75rem',
-        '2xl': '1rem',
-        '3xl': '1.25rem',
+        'DEFAULT': '0.5rem',      // 8px - slightly rounder for modern feel
+        'sm': '0.375rem',         // 6px
+        'md': '0.5rem',           // 8px
+        'lg': '0.75rem',          // 12px
+        'xl': '1rem',             // 16px
+        '2xl': '1.25rem',         // 20px
+        '3xl': '1.5rem',          // 24px
         'full': '9999px',
+      },
+      boxShadow: {
+        'glass': '0 2px 8px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04)',
+        'glass-lg': '0 8px 24px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.05)',
+        'glass-xl': '0 16px 48px rgba(15, 23, 42, 0.1), 0 8px 24px rgba(15, 23, 42, 0.06)',
+        'glass-dark': '0 2px 8px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2)',
+        'glass-dark-lg': '0 8px 24px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.25)',
+      },
+      transitionDuration: {
+        'fast': '150ms',
+        'normal': '200ms',
+        'slow': '300ms',
       },
     },
   },

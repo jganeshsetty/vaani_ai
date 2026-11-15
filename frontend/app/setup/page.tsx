@@ -260,6 +260,16 @@ export default function SetupPage() {
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               />
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Used if you have a cloned voice profile</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-3">Want a voice that sounds exactly like you? Create your custom voice clone.</p>
+              <Link
+                href="/voice-cloning"
+                className="mt-3 inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-md shadow-blue-600/20 min-h-[44px]"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Create Voice Clone
+              </Link>
             </div>
           </div>
 

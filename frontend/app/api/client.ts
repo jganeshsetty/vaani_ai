@@ -131,6 +131,40 @@ export interface SummaryData {
   updated_at: string;
 }
 
+/** Voice cloning API methods */
+export async function cloneVoice(audioFile: File): Promise<{ speaker_id: string; message: string }> {
+  const base = getApiBase();
+  const formData = new FormData();
+  formData.append('file', audioFile);
+  const res = await fetch(`${base}/voice/clone`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Voice cloning failed: ${errorText}`);
+  }
+  return res.json();
+}
+
+export async function saveVoiceClone(speakerId: string, voiceId?: string): Promise<any> {
+  const base = getApiBase();
+  const res = await fetch(`${base}/setup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      user_name: 'Ganesh',
+      persona: 'Personal autonomous voice assistant',
+      base_instructions: 'Speak politely and warmly on behalf of the user.',
+      voice_id: voiceId || 'Aarohi',
+      speaker_id: speakerId,
+      phone: '+91 8660039103',
+    }),
+  });
+  if (!res.ok) throw new Error('Failed to save voice clone');
+  return res.json();
+}
+
 // --- API Methods ---
 
 /** Page 1: Initiate dynamic outbound call session */
