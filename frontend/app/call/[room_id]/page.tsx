@@ -308,9 +308,11 @@ function NativeDialerCallPage() {
     return `${mins.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const callerName = callerParam || session?.caller_name || 'Ganesh';
-  const recipientName = recipientParam || session?.target_name || 'Recipient';
-  const phoneDisplay = phoneParam || session?.target_number || '+91 8660039103';
+  const isPermanent = Boolean(roomId && roomId.startsWith('p-'));
+  const fallbackCaller = isPermanent ? roomId.replace('p-', '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Host';
+  const callerName = callerParam || session?.caller_name || fallbackCaller;
+  const recipientName = recipientParam || session?.target_name || (isPermanent ? 'Caller' : 'Recipient');
+  const phoneDisplay = phoneParam || session?.target_number || 'Voice Call Session';
 
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center p-3 sm:p-6 transition-colors duration-200 ${

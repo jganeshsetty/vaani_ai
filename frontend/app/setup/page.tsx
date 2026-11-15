@@ -5,14 +5,12 @@ import Link from 'next/link';
 import { fetchSetupProfile, saveSetupProfile, fetchRecentSessions, SetupResponse } from '../api/client';
 
 export default function SetupPage() {
-  const [userName, setUserName] = useState('Ganesh');
-  const [persona, setPersona] = useState('Personal autonomous voice assistant representing Ganesh');
-  const [baseInstructions, setBaseInstructions] = useState(
-    'Speak politely and warmly on behalf of Ganesh. Greet the caller, identify why they called, answer common questions, take a detailed message, and let them know Ganesh will get back to them if urgent.'
-  );
+  const [userName, setUserName] = useState('');
+  const [persona, setPersona] = useState('');
+  const [baseInstructions, setBaseInstructions] = useState('');
   const [voiceId, setVoiceId] = useState('Aarohi');
   const [speakerId, setSpeakerId] = useState('');
-  const [phone, setPhone] = useState('+91 8660039103');
+  const [phone, setPhone] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -30,8 +28,8 @@ export default function SetupPage() {
           fetchSetupProfile(),
           fetchRecentSessions(10),
         ]);
-        if (data && data.profile) {
-          setUserName(data.profile.user_name || 'Ganesh');
+        if (data && data.profile && data.profile.user_name) {
+          setUserName(data.profile.user_name);
           setPersona(data.profile.persona || '');
           setBaseInstructions(data.profile.base_instructions || '');
           setVoiceId(data.profile.voice_id || 'Aarohi');
@@ -53,6 +51,10 @@ export default function SetupPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!userName.trim()) {
+      setNotification('Please enter your full name before saving.');
+      return;
+    }
     setSaving(true);
     setNotification(null);
     try {
@@ -96,9 +98,10 @@ export default function SetupPage() {
     }
   };
 
+  const userSlug = userName.trim() ? userName.trim().toLowerCase().replace(/[^a-z0-9]/g, '-') : 'my-link';
   const permanentUrl = savedData
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}${savedData.permanent_link}`
-    : `${typeof window !== 'undefined' ? window.location.origin : ''}/call/p-${userName.toLowerCase()}`;
+    : `${typeof window !== 'undefined' ? window.location.origin : ''}/call/p-${userSlug}`;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn">
@@ -173,7 +176,7 @@ export default function SetupPage() {
                 value={userName}
                 onChange={(e) => setUserName(e.target.value)}
                 required
-                placeholder="e.g. Ganesh"
+                placeholder="e.g. Alex Johnson"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               />
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Used to personalize agent greetings</p>
@@ -187,7 +190,7 @@ export default function SetupPage() {
                 type="text"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+91 8660039103"
+                placeholder="e.g. +91 98765 43210"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               />
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Where callers normally reach you</p>
@@ -203,7 +206,7 @@ export default function SetupPage() {
               type="text"
               value={persona}
               onChange={(e) => setPersona(e.target.value)}
-              placeholder="e.g. Personal autonomous voice assistant representing Ganesh"
+              placeholder="e.g. Personal autonomous voice assistant representing me"
               className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
             />
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">How the AI describes its relationship to you</p>
@@ -307,7 +310,7 @@ export default function SetupPage() {
           </div>
 
           <Link
-            href={savedData ? savedData.permanent_link : `/call/p-${userName.toLowerCase()}`}
+            href={savedData ? savedData.permanent_link : `/call/p-${userSlug}`}
             target="_blank"
             className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs transition-all flex items-center gap-2 self-start sm:self-center shadow-sm min-h-[44px]"
           >

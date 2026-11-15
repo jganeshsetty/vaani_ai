@@ -92,7 +92,7 @@ class CallSessionOut(BaseModel):
     mode: CallMode
     target_number: Optional[str] = None
     target_name: Optional[str] = None
-    caller_name: Optional[str] = "Ganesh"
+    caller_name: Optional[str] = "Host"
     context_prompt: str
     voice_tone: Optional[str] = "natural"
     status: CallStatus = CallStatus.PENDING

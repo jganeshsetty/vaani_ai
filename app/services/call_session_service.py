@@ -29,7 +29,7 @@ def _serialize_session(doc: dict) -> CallSessionOut:
         mode=CallMode(doc.get("mode", CallMode.OUTBOUND.value)),
         target_number=doc.get("target_number"),
         target_name=doc.get("target_name"),
-        caller_name=doc.get("caller_name", "Ganesh"),
+        caller_name=doc.get("caller_name", "User"),
         context_prompt=doc.get("context_prompt", ""),
         voice_tone=doc.get("voice_tone", "natural"),
         status=CallStatus(doc.get("status", CallStatus.PENDING.value)),
@@ -51,7 +51,7 @@ async def create_session(
     context_prompt: str,
     language: Language = Language.ENGLISH,
     target_name: Optional[str] = None,
-    caller_name: Optional[str] = "Ganesh",
+    caller_name: Optional[str] = "User",
     voice_tone: Optional[str] = "natural",
     scheduled_time: Optional[datetime] = None,
     speaker_id: Optional[str] = None,
@@ -67,7 +67,7 @@ async def create_session(
         "mode": mode.value,
         "target_number": target_number,
         "target_name": target_name,
-        "caller_name": caller_name or "Ganesh",
+        "caller_name": caller_name or "User",
         "context_prompt": context_prompt,
         "voice_tone": voice_tone or "natural",
         "status": initial_status,
@@ -191,13 +191,13 @@ async def get_user_profile(user_id: str = "default_user") -> dict:
         return doc
     return {
         "user_id": user_id,
-        "user_name": "Ganesh",
-        "persona": "Personal autonomous voice assistant representing Ganesh",
-        "base_instructions": "Speak politely and warmly on behalf of Ganesh. Greet the caller, identify why they called, answer questions naturally, and inform them Ganesh will follow up if urgent.",
+        "user_name": "",
+        "persona": "",
+        "base_instructions": "",
         "voice_id": "Aarohi",
         "speaker_id": None,
-        "phone": "+918660039103",
-        "permanent_room_id": f"p-ganesh",
+        "phone": "",
+        "permanent_room_id": "p-my-link",
     }
 
 
@@ -206,7 +206,7 @@ async def save_user_profile(data: dict, user_id: str = "default_user") -> dict:
     db = get_database()
     col = db["user_profiles"]
     now = _now()
-    clean_name = data.get("user_name", "Ganesh").strip()
+    clean_name = data.get("user_name", "").strip() or "User"
     slug = "".join(c.lower() if c.isalnum() else "-" for c in clean_name).strip("-") or "user"
     permanent_room_id = f"p-{slug}"
 

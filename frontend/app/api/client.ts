@@ -149,16 +149,17 @@ export async function cloneVoice(audioFile: File): Promise<{ speaker_id: string;
 
 export async function saveVoiceClone(speakerId: string, voiceId?: string): Promise<any> {
   const base = getApiBase();
+  const savedName = typeof window !== 'undefined' ? localStorage.getItem('vaani_user_name') || 'User' : 'User';
   const res = await fetch(`${base}/setup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      user_name: 'Ganesh',
-      persona: 'Personal autonomous voice assistant',
+      user_name: savedName,
+      persona: `Personal autonomous voice assistant representing ${savedName}`,
       base_instructions: 'Speak politely and warmly on behalf of the user.',
       voice_id: voiceId || 'Aarohi',
       speaker_id: speakerId,
-      phone: '+91 8660039103',
+      phone: '',
     }),
   });
   if (!res.ok) throw new Error('Failed to save voice clone');

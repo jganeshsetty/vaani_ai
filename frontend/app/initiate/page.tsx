@@ -5,12 +5,10 @@ import Link from 'next/link';
 import { initiateCall, InitiateCallResponse } from '../api/client';
 
 export default function InitiatePage() {
-  const [phoneNumber, setPhoneNumber] = useState('+91 8660039103');
-  const [recipientName, setRecipientName] = useState('Ganesh');
-  const [callerName, setCallerName] = useState('Ganesh');
-  const [contextPrompt, setContextPrompt] = useState(
-    'Discuss project voice agent call features: confirm Feature 1 and Feature 2 status, review voice cloning, and coordinate next steps.'
-  );
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [recipientName, setRecipientName] = useState('');
+  const [callerName, setCallerName] = useState('');
+  const [contextPrompt, setContextPrompt] = useState('');
   const [voiceTone, setVoiceTone] = useState<'natural' | 'professional' | 'urgent' | 'friendly'>('natural');
 
   const [loading, setLoading] = useState(false);
@@ -43,7 +41,7 @@ export default function InitiatePage() {
       const res = await initiateCall({
         target_number: phoneNumber.trim(),
         recipient_name: recipientName.trim() || 'Recipient',
-        caller_name: callerName.trim() || 'Ganesh',
+        caller_name: callerName.trim() || 'User',
         context_prompt: contextPrompt.trim(),
         voice_tone: voiceTone,
       });
@@ -51,7 +49,9 @@ export default function InitiatePage() {
       // Compute full domain URL on client
       const fullUrl = `${window.location.origin}${res.link}`;
       res.full_url = fullUrl;
-      res.formatted_sms = `Hello ${res.recipient_name}! This is ${res.caller_name}. Please join our secure voice call here:\n\n👉 ${fullUrl}\n\n(No app required • Opens directly in mobile browser)`;
+      const hostName = res.caller_name || 'My Voice Assistant';
+      const targetName = res.recipient_name || 'there';
+      res.formatted_sms = `Hello ${targetName}! This is ${hostName}. Please join our secure voice call here:\n\n👉 ${fullUrl}\n\n(No app required • Opens directly in mobile browser)`;
 
       setResult(res);
     } catch (err: any) {
@@ -103,7 +103,7 @@ export default function InitiatePage() {
                   type="text"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="+91 9876543210"
+                  placeholder="e.g. +91 98765 43210"
                   required
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
                 />
@@ -119,7 +119,7 @@ export default function InitiatePage() {
                 type="text"
                 value={recipientName}
                 onChange={(e) => setRecipientName(e.target.value)}
-                placeholder="e.g. Alex"
+                placeholder="e.g. Alex Johnson"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               />
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Person the AI will address on call</p>
@@ -136,7 +136,7 @@ export default function InitiatePage() {
                 type="text"
                 value={callerName}
                 onChange={(e) => setCallerName(e.target.value)}
-                placeholder="e.g. Ganesh"
+                placeholder="e.g. Your Name"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/80 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               />
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">The agent speaks on your behalf</p>

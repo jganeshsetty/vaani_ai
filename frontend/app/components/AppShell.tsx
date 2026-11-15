@@ -11,7 +11,7 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const [darkMode, setDarkMode] = useState(false);
-  const [userName, setUserName] = useState('Ganesh');
+  const [userName, setUserName] = useState('');
 
   useEffect(() => {
     try {

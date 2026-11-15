@@ -48,7 +48,7 @@ class InitiateCallRequest(BaseModel):
     """Payload to initiate a new dynamic call session."""
     target_number: str = Field(..., description="Target phone number (e.g. +91 8660039103)")
     recipient_name: Optional[str] = Field("Recipient", description="Name of the person being called")
-    caller_name: Optional[str] = Field("Ganesh", description="Your name / caller identity")
+    caller_name: Optional[str] = Field("Host", description="Your name / caller identity")
     context_prompt: str = Field(..., min_length=1, max_length=3000, description="Exact context/message to convey")
     voice_tone: Optional[str] = Field("natural", description="Conversation tone: natural, professional, urgent, friendly")
     speaker_id: Optional[str] = Field(None, description="Gnani voice cloning profile ID if available")
@@ -73,7 +73,7 @@ class SessionResponse(BaseModel):
     mode: str
     target_number: Optional[str] = None
     target_name: Optional[str] = None
-    caller_name: Optional[str] = "Ganesh"
+    caller_name: Optional[str] = "Host"
     context_prompt: str
     voice_tone: Optional[str] = "natural"
     status: str
@@ -130,7 +130,7 @@ async def initiate_call_session(req: InitiateCallRequest):
         mode=CallMode.OUTBOUND,
         target_number=clean_phone,
         target_name=req.recipient_name or "Recipient",
-        caller_name=req.caller_name or "Ganesh",
+        caller_name=req.caller_name or "Host",
         context_prompt=req.context_prompt,
         voice_tone=req.voice_tone or "natural",
         language=req.language or Language.ENGLISH,
@@ -165,7 +165,7 @@ async def initiate_call_session(req: InitiateCallRequest):
 async def send_message_compat(data: dict):
     phone = data.get("phone", "+918660039103")
     recipient = data.get("recipient_name", "Recipient")
-    caller = data.get("caller", "Ganesh")
+    caller = data.get("caller", "Host")
     instructions = data.get("instructions", "Call setup")
 
     req = InitiateCallRequest(
@@ -193,9 +193,9 @@ async def send_message_compat(data: dict):
 async def get_setup_configuration(user_id: str = "default_user"):
     """Fetch current one-time user profile & permanent auto-responder configuration."""
     profile = await get_user_profile(user_id)
-    permanent_room_id = profile.get("permanent_room_id", "p-ganesh")
+    permanent_room_id = profile.get("permanent_room_id", "p-my-link")
     permanent_link = f"/call/{permanent_room_id}"
-    user_name = profile.get("user_name", "Ganesh")
+    user_name = profile.get("user_name", "Host")
 
     return {
         "status": "success",
@@ -280,7 +280,7 @@ async def get_recent_call_summaries(limit: int = 20):
             "id": s.id,
             "room_id": s.room_id,
             "mode": s.mode.value,
-            "caller_name": getattr(s, "caller_name", "Ganesh"),
+            "caller_name": getattr(s, "caller_name", "Host"),
             "target_name": s.target_name or "Participant",
             "target_number": s.target_number,
             "status": s.status.value,
@@ -304,7 +304,7 @@ async def get_session_by_room_id(room_id: str):
         # Check if this is a permanent profile room
         is_permanent = room_id.startswith("p-")
         target_name = room_id.replace("p-", "").capitalize() if is_permanent else "Recipient"
-        caller_name = room_id.replace("p-", "").capitalize() if is_permanent else "Ganesh"
+        caller_name = room_id.replace("p-", "").capitalize() if is_permanent else "Host"
 
         session = await create_session(
             mode=CallMode.INBOUND if is_permanent else CallMode.OUTBOUND,
@@ -326,7 +326,7 @@ async def get_session_by_room_id(room_id: str):
         mode=session.mode.value,
         target_number=session.target_number,
         target_name=session.target_name,
-        caller_name=getattr(session, "caller_name", "Ganesh"),
+        caller_name=getattr(session, "caller_name", "Host"),
         context_prompt=session.context_prompt,
         voice_tone=getattr(session, "voice_tone", "natural"),
         status=session.status.value,
@@ -384,7 +384,7 @@ async def get_call_summary(room_id: str):
     return SummaryResponse(
         room_id=session.room_id,
         status=session.status.value,
-        caller_name=getattr(session, "caller_name", "Ganesh"),
+        caller_name=getattr(session, "caller_name", "Host"),
         recipient_name=session.target_name or "Participant",
         summary=summary or "Call completed. Discussion captured in transcript.",
         action_items=action_items or ["Review call transcript notes."],
@@ -473,13 +473,13 @@ async def call_websocket(websocket: WebSocket, room_id: str):
         session = await get_session_by_room(room_id)
         if session is None:
             is_permanent = room_id.startswith("p-")
-            caller_name = room_id.replace("p-", "").capitalize() if is_permanent else "Ganesh"
+            caller_name = room_id.replace("p-", "").replace("-", " ").capitalize() if is_permanent else "Host"
             session = await create_session(
                 mode=CallMode.INBOUND if is_permanent else CallMode.OUTBOUND,
                 target_number=None,
-                target_name="Recipient",
+                target_name="Caller" if is_permanent else "Recipient",
                 caller_name=caller_name,
-                context_prompt=f"You are {caller_name}'s personal voice assistant. Greet the recipient warmly and speak conversationally.",
+                context_prompt=f"You are {caller_name}'s personal voice assistant. Greet the caller warmly and speak conversationally.",
                 language=Language.ENGLISH,
                 room_id=room_id,
             )
@@ -502,7 +502,7 @@ async def call_websocket(websocket: WebSocket, room_id: str):
 
         evon = evon_client()
 
-        caller = getattr(session, "caller_name", "Ganesh")
+        caller = getattr(session, "caller_name", None) or "Host"
         recipient = session.target_name or "there"
         tone = getattr(session, "voice_tone", "natural")
 
@@ -600,8 +600,14 @@ async def call_websocket(websocket: WebSocket, room_id: str):
 
             return evon_response
 
-        # Automatic initial greeting
-        initial_greeting = f"Hello {recipient}! This is {caller}'s AI voice assistant. Thanks for answering! How can I help you today?"
+        # Automatic initial greeting tailored to outbound objective vs inbound screening
+        if session.mode == CallMode.INBOUND or room_id.startswith("p-"):
+            initial_greeting = f"Hello! You've reached {caller}'s personal voice assistant. {caller} is currently unavailable, but I'm here to speak with you and take down your message. How can I help you today?"
+        else:
+            prompt_clean = session.context_prompt.strip().rstrip(".")
+            if len(prompt_clean) > 100:
+                prompt_clean = prompt_clean[:97] + "..."
+            initial_greeting = f"Hello {recipient}! This is {caller}'s personal AI assistant calling on their behalf. I'm reaching out regarding {prompt_clean}. Do you have a quick moment?"
         await websocket.send_json({
             "type": "transcript",
             "data": {
